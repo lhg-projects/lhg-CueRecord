@@ -1,90 +1,44 @@
-# CueRecord
+# lhg-CueRecord · macOS 录屏提词器
 
-[![Latest release](https://img.shields.io/github/v/release/nolangz/CueRecord?label=release)](https://github.com/nolangz/CueRecord/releases/latest)
-[![macOS](https://img.shields.io/badge/platform-macOS-111111)](https://github.com/nolangz/CueRecord/releases/latest)
+> [!TIP]
+> **TL;DR**：macOS 原生录屏 App，一个软件全包高清录屏 + 摄像头画中画 + 麦克风 / 系统音频 + 内置提词器 + 4K 导出，专为录教程、录课、产品演示和口播视频打造。基于 [nolangz/CueRecord](https://github.com/nolangz/CueRecord) v2.0.4（Apache License 2.0）二次开发，后续在此基础上做 lhg 自己的功能。
+
+[![Platform](https://img.shields.io/badge/Platform-macOS-111111)]()
 [![Swift](https://img.shields.io/badge/Swift-FA7343?logo=swift&logoColor=white)](https://www.swift.org/)
-[![License](https://img.shields.io/github/license/nolangz/CueRecord)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
-Native macOS screen recorder with teleprompter, camera overlay, system audio capture, 4K export, and AI breath cuts for product demos, tutorials, courses, and presentations.
+录一条像样的教程视频，通常要拼三件工具：录屏软件录画面、提词器 App 照着稿子念、摄像头小窗单独开——录完还要对轨、合成，来回折腾。**lhg-CueRecord 把这四件事装进一个原生 macOS App**：选好录制区域、打开提词器照着念，屏幕、摄像头、麦克风和系统声音一次录全，直接导出成片。
 
-CueRecord combines high-resolution screen recording, optional camera overlay, microphone and system audio capture, AI-assisted script preparation, and a built-in teleprompter workflow in one desktop app.
+**适合谁**：录网课 / 教程的知识创作者、做产品演示和 SaaS walkthrough 的开发者与创始人、录口播和演示稿的演讲者——所有「要对着稿子录屏」的人。
 
-It is built for creators, educators, founders, and developers who need to record polished walkthrough videos without stitching together a separate screen recorder, teleprompter app, camera overlay tool, and audio capture setup.
+## 核心功能
 
-## Nolan Lai
+| 功能 | 说明 |
+|---|---|
+| 🎬 高清录屏 | 原生 Swift 实现，全屏 / 窗口 / 自选区域录制，支持多显示器（含外接屏） |
+| 🪟 摄像头画中画 | 可选摄像头 overlay，预览窗可拖动，和屏幕内容一次合成 |
+| 🎙️ 双路音频 | 麦克风 + 系统音频同时录制，最终成片为单轨混合音频，不用后期对轨 |
+| 📜 内置提词器 | 可调行数、跟读滚动；录的时候照着念，不用背稿、不用另开提词器 |
+| 🤖 AI 气口断句 | 接 OpenAI 兼容模型，自动给提词稿加自然断句（AI Breath Cuts） |
+| 📊 PPT 稿导入 | PowerPoint / PPTX 演讲者备注一键导入为提词稿 |
+| 🖥️ 4K 导出 | 导出分辨率预设最高 4K，选之前就显示预期输出尺寸 |
+| 🗂️ 素材归档 | 原始素材统一收在项目目录的 `raw_data/`，成片留在项目根目录，不丢不乱 |
+| 🗣️ 本地语音识别 | 内置本地 ASR 模型资产（Git LFS 管理），语音引导提词不依赖云端 |
 
-Personal website: [nolanlai.com](https://www.nolanlai.com/)
+## 快速开始
 
-<img src="docs/assets/nolanlai-slogan-en.png" alt="Tools for creators who'd rather think than fiddle." width="680">
+### 源码构建
 
-<img src="docs/assets/nolanlai-slogan-zh.png" alt="给更想创作，而不是反复折腾工具的人。" width="680">
-
-## Maintenance Note
-
-这是一个已经发布的 project。后续需要改动的时候要非常小心，并测试每一项可能影响的地方。
-
-## Download
-
-Download the latest signed and notarized macOS build:
-
-- [Download CueRecord-v2.0.4.dmg](https://github.com/nolangz/CueRecord/releases/download/v2.0.4/CueRecord-v2.0.4.dmg)
-- [Release notes](https://github.com/nolangz/CueRecord/releases/tag/v2.0.4)
-
-## Use Cases
-
-- Product demo videos and SaaS walkthroughs
-- Tutorial, course, and training recordings
-- Founder updates, launch videos, and pitch recordings
-- Developer demos with screen, camera, voice, and system audio
-- Scripted presentations that need a teleprompter while recording
-
-## Features
-
-- Native Swift macOS app for full-screen, window, and selected-area recording
-- Multi-display support, including external display selection
-- Optional camera overlay with draggable preview window
-- Microphone and system audio capture
-- Single-track mixed audio output in the final composited recording
-- Built-in teleprompter with adjustable line count and follow-along behavior
-- AI Breath Cuts for adding natural teleprompter line breaks with OpenAI-compatible models
-- PowerPoint/PPTX speaker-note import for presentation scripts
-- Export resolution presets up to 4K with visible expected output dimensions
-- Minimal export progress in the project sidebar
-- Raw recording assets organized under `raw_data/` while the final composited movie stays in the project folder
-- Developer ID signed, notarized, and stapled DMG for distribution
-
-## Credits
-
-The teleprompter portion of CueRecord is based on [f/textream](https://github.com/f/textream).
-
-## Permissions
-
-CueRecord uses standard macOS privacy permissions:
-
-- Screen Recording: required to capture the selected display, window, or area
-- Microphone: required when recording voice or using speech-guided teleprompter behavior
-- Camera: required for the camera overlay
-- System Audio: required when system audio recording is enabled
-
-You can manage these permissions in macOS System Settings under Privacy & Security.
-
-## Requirements
-
-- macOS 14.1 or later
-- Apple Silicon or Intel Mac
-
-## Build From Source
-
-This repository uses Git LFS for bundled model and native library assets. Install Git LFS before cloning or pulling dependencies.
+本仓库用 Git LFS 管理内置模型和原生库，先装 Git LFS 再拉代码：
 
 ```bash
 git lfs install
-git clone https://github.com/nolangz/CueRecord.git
-cd CueRecord
+git clone https://github.com/lhg-projects/lhg-CueRecord.git
+cd lhg-CueRecord
 git lfs pull
 ```
 
-Build a local debug app:
+构建本地调试版：
 
 ```bash
 xcodebuild \
@@ -95,68 +49,56 @@ xcodebuild \
   build
 ```
 
-Run focused recording-core checks:
+跑录制核心的专项检查：
 
 ```bash
 scripts/run-recording-core-tests.sh
 ```
 
-## Release Build
+### 预编译包
 
-`build.sh` creates a universal macOS app, signs it with Developer ID, builds a DMG, submits it to Apple notarization, staples the ticket, and validates the final artifact.
+本仓库暂不提供签名安装包。上游提供已签名并公证的 v2.0.4 DMG，可在 [nolangz/CueRecord Releases](https://github.com/nolangz/CueRecord/releases) 下载；本仓库与上游 v2.0.4 代码一致，装上游包等于先体验同一版本。
 
-Prerequisites:
+## 系统要求
 
-- Xcode command line tools
-- Developer ID Application certificate installed in Keychain
-- Apple notarization credentials saved in a notarytool keychain profile
-- Git LFS assets pulled locally
+- macOS 14.1 或更高
+- Apple Silicon 或 Intel Mac
 
-Default release environment:
+## 权限说明
+
+录制时按需申请 macOS 标准隐私权限，可在「系统设置 → 隐私与安全性」里管理：
+
+- **屏幕录制**：录制所选显示器 / 窗口 / 区域，必须
+- **麦克风**：录人声或使用语音引导提词时需要
+- **摄像头**：开启摄像头画中画时需要
+- **系统音频**：开启系统音频录制时需要
+
+## 发布构建
+
+`build.sh` 生成通用（Universal）App、签名、打包 DMG 并提交 Apple 公证。签名身份走环境变量，换成你自己的 Developer ID 即可：
 
 ```bash
-TEAM_ID=JKDNYL5U42
-SIGN_IDENTITY='Developer ID Application: NUOLIN LAI (JKDNYL5U42)'
-NOTARY_PROFILE=cuerecord-notary
-```
-
-Create a release DMG:
-
-```bash
+TEAM_ID=<你的 Team ID>
+SIGN_IDENTITY='Developer ID Application: <你的名字> (<Team ID>)'
+NOTARY_PROFILE=<你的 notarytool keychain profile>
 ./build.sh
 ```
 
-The output is written to:
+产物输出到 `build/release/CueRecord.dmg`。前置条件：Xcode 命令行工具、本机 Keychain 里装好 Developer ID 证书、Git LFS 资产已拉全。
+
+## 项目结构
 
 ```text
-build/release/CueRecord.dmg
+CueRecord/                App 源码
+CueRecord/Recording/      录制管线、界面、区域选择、指标、导出组织
+Tests/RecordingCoreTests/ 录制核心行为的命令行专项检查
+Vendor/                   Git LFS 管理的原生库与本地 ASR 模型资产
+build.sh                  签名 + 公证的发布 DMG 构建脚本
 ```
 
-## Project Structure
+## 与上游的关系
 
-```text
-CueRecord/                App source
-CueRecord/Recording/      Recording pipeline, UI, selection, metrics, export organization
-Tests/RecordingCoreTests/ Focused command-line checks for recording core behavior
-Vendor/                   Git LFS tracked native libraries and local ASR model assets
-build.sh                  Signed, notarized release DMG build script
-```
-
-## Notes
-
-- Final exported recordings are designed to contain a single mixed audio track.
-- Intermediate screen, camera, overlay metadata, and metrics files are kept under `raw_data/`.
-- Large bundled assets are tracked with Git LFS and are required for a complete local build.
-- Related search terms: macOS screen recorder, teleprompter app, camera overlay recorder, system audio recorder, product demo recorder, tutorial video recorder, 4K screen recording, OpenAI-compatible script editing.
-
-## License
-
-CueRecord is released under the [Apache License 2.0](LICENSE).
-
-## Vibe Creators
-
-欢迎喜欢 vibe create 的朋友加入 Vibe Creators 群。
-
-由于群已经满 200 人了，可以扫我的微信码加群。
-
-<img src="docs/assets/vibe-creators-wechat-qr.jpg" alt="Vibe Creators WeChat QR code" width="280">
+- 本项目 fork 自 [nolangz/CueRecord](https://github.com/nolangz/CueRecord) v2.0.4，依 **Apache License 2.0** 二次开发；许可证原文见 [LICENSE](LICENSE)，上游版权声明保留。
+- 其中**提词器部分源自 [f/textream](https://github.com/f/textream)**（上游 Credits 已注明，此处沿袭标注）。
+- 本次整改范围：README 与项目元信息已按 lhg-projects 自有项目规范重写，去掉上游作者的个人品牌内容；**代码与上游 v2.0.4 保持一致**，后续功能迭代在本仓库进行。
+- 这是一个已发布的成熟项目，改动遵循上游 `AGENTS.md` 的约定：改动保持小而聚焦，每处改动测试受影响的区域后再算完成。
