@@ -88,7 +88,7 @@ final class InterfaceLanguageSettings: ObservableObject {
         "Untitled": "未命名",
         "Version": "版本",
         "A recording workspace for scripted screen videos.": "面向脚本化屏幕视频的录制工作区。",
-        "Made by Nolan Lai": "Nolan Lai 制作",
+        "Based on nolangz/CueRecord · Apache-2.0": "基于 nolangz/CueRecord · Apache-2.0",
 
         "Set Up CueRecord": "设置 CueRecord",
         "Permissions": "权限",

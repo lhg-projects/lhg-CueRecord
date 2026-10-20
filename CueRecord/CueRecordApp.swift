@@ -157,7 +157,7 @@ struct CueRecordApp: App {
             CommandGroup(replacing: .windowArrangement) { }
             CommandGroup(replacing: .help) {
                 Button(interfaceLanguage.text("CueRecord Help")) {
-                    if let url = URL(string: "https://github.com/nolanlai/cuerecord") {
+                    if let url = URL(string: "https://github.com/lhg-projects/lhg-CueRecord") {
                         NSWorkspace.shared.open(url)
                     }
                 }

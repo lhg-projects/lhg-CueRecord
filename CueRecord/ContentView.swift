@@ -79,7 +79,7 @@ struct ContentView: View {
     @State private var recordingEditorWindow = RecordingEditorWindow()
     @State private var hidesMainUIForRecordingPreview = false
     @State private var mainWindowsHiddenForRecordingPreview: [NSWindow] = []
-    @State private var isShowingPostRecordingOptions = false
+    @State private var postRecordingOptionsTakeURL: URL?
     @State private var editingProjectURL: URL?
     @State private var editingProjectTitleText = ""
     @State private var editingPageTitleIndex: Int?
@@ -741,7 +741,7 @@ struct ContentView: View {
             if hasPending {
                 presentPostRecordingRenderOptions()
             } else {
-                isShowingPostRecordingOptions = false
+                postRecordingOptionsTakeURL = nil
             }
         }
 	        .onAppear {
@@ -1358,6 +1358,10 @@ struct ContentView: View {
 
     private func startRecordedTeleprompterFromPreview() {
         isTextFocused = false
+        // Close any editor left over from the previous take, so a stale window can never
+        // shadow the editor for the take that is about to be recorded.
+        recordingEditorWindow.hide()
+        postRecordingOptionsTakeURL = nil
         prepareRecordingOutputName()
         let shouldShowTeleprompter = currentPageHasContent
 
@@ -1491,39 +1495,39 @@ struct ContentView: View {
     private func presentRecordedTakeEditor(for capturedOutput: CapturedRecordingOutput) {
         guard !recordingController.isRecording,
               !recordingController.isStopping,
-              !recordingController.isStarting,
-              !isShowingPostRecordingOptions
+              !recordingController.isStarting
         else {
             return
         }
 
         isTextFocused = false
-        isShowingPostRecordingOptions = true
+        postRecordingOptionsTakeURL = capturedOutput.outputURL.standardizedFileURL
         DispatchQueue.main.async {
             recordingEditorWindow.show(
                 controller: recordingController,
                 capturedOutput: capturedOutput,
                 onDelete: {
-                    isShowingPostRecordingOptions = false
+                    postRecordingOptionsTakeURL = nil
                     recordingController.deleteCapturedRecording(capturedOutput)
                 },
                 onExport: { decision, exportSettings in
-                    isShowingPostRecordingOptions = false
+                    postRecordingOptionsTakeURL = nil
                     recordingController.renderCapturedRecording(
                         capturedOutput,
                         editDecision: decision,
                         exportSettings: exportSettings
                     )
                 },
-                onExportCameraOnly: { _, exportSettings in
-                    isShowingPostRecordingOptions = false
-                    recordingController.renderPendingCapturedRecording(
+                onExportCameraOnly: { output, exportSettings in
+                    postRecordingOptionsTakeURL = nil
+                    recordingController.renderCapturedRecording(
+                        output,
                         mode: .cameraOnlyTransparent,
                         exportSettings: exportSettings
                     )
                 },
                 onClose: {
-                    isShowingPostRecordingOptions = false
+                    postRecordingOptionsTakeURL = nil
                 }
             )
         }
@@ -1540,27 +1544,33 @@ struct ContentView: View {
             }
             return
         }
-        guard !isShowingPostRecordingOptions else { return }
+        // Key the open editor to the take it was opened for. The previous boolean flag
+        // blocked the editor for every take recorded while a stale editor stayed open.
+        let takeURL = capturedOutput.outputURL.standardizedFileURL
+        guard RecordingEditorPresentation.shouldPresent(
+            currentTakeURL: postRecordingOptionsTakeURL,
+            for: takeURL
+        ) else { return }
 
-        isShowingPostRecordingOptions = true
+        postRecordingOptionsTakeURL = takeURL
         restoreMainUIAfterRecordingPreview(focusEditor: false)
         DispatchQueue.main.async {
             recordingEditorWindow.show(
                 controller: recordingController,
                 capturedOutput: capturedOutput,
                 onDelete: {
-                    isShowingPostRecordingOptions = false
+                    postRecordingOptionsTakeURL = nil
                     recordingController.deletePendingCapturedRecording()
                 },
                 onExport: { decision, exportSettings in
-                    isShowingPostRecordingOptions = false
+                    postRecordingOptionsTakeURL = nil
                     recordingController.renderPendingCapturedRecording(
                         editDecision: decision,
                         exportSettings: exportSettings
                     )
                 },
                 onExportCameraOnly: { output, exportSettings in
-                    isShowingPostRecordingOptions = false
+                    postRecordingOptionsTakeURL = nil
                     recordingController.renderCapturedRecording(
                         output,
                         mode: .cameraOnlyTransparent,
@@ -1568,7 +1578,7 @@ struct ContentView: View {
                     )
                 },
                 onClose: {
-                    isShowingPostRecordingOptions = false
+                    postRecordingOptionsTakeURL = nil
                 }
             )
         }
@@ -1620,7 +1630,7 @@ struct AboutView: View {
             Divider().padding(.horizontal, 20)
 
             VStack(spacing: 4) {
-                Text(t("Made by Nolan Lai"))
+                Text(t("Based on nolangz/CueRecord · Apache-2.0"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
                 Text("CueRecord")

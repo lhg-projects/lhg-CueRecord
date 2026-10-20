@@ -517,6 +517,32 @@ func testSpeechTrackingThreeCJKAnchorCrossesBreakTokens() throws {
     try expect(match.endOffset == expectedEndOffset, "CJK anchor should preserve source offsets across breaks")
 }
 
+func testRecordingEditorPresentation() throws {
+    let firstTake = URL(fileURLWithPath: "/tmp/project/Untitled Project - lesson 1/WindowRecord.mov")
+    let secondTake = URL(fileURLWithPath: "/tmp/project/Untitled Project - lesson 2/WindowRecord.mov")
+
+    try expect(
+        RecordingEditorPresentation.shouldPresent(currentTakeURL: nil, for: firstTake),
+        "A take must get an editor when no editor is open"
+    )
+    try expect(
+        !RecordingEditorPresentation.shouldPresent(currentTakeURL: firstTake, for: firstTake),
+        "The take whose editor is already open must not reopen the window"
+    )
+    try expect(
+        RecordingEditorPresentation.shouldPresent(currentTakeURL: firstTake, for: secondTake),
+        "A new take must get its own editor even while a stale editor stays open"
+    )
+
+    let samePathWrittenDifferently = firstTake
+        .deletingLastPathComponent()
+        .appendingPathComponent("./WindowRecord.mov")
+    try expect(
+        !RecordingEditorPresentation.shouldPresent(currentTakeURL: firstTake, for: samePathWrittenDifferently),
+        "Equivalent paths must compare as the same take"
+    )
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -535,7 +561,8 @@ let tests: [(String, () throws -> Void)] = [
     ("TeleprompterPaceCueTokenization", testTeleprompterPaceCueTokenization),
     ("TeleprompterLegacySlowCueTokenization", testTeleprompterLegacySlowCueTokenization),
     ("SpeechTrackingThreeWordAnchorCrossesLineBreaks", testSpeechTrackingThreeWordAnchorCrossesLineBreaks),
-    ("SpeechTrackingThreeCJKAnchorCrossesBreakTokens", testSpeechTrackingThreeCJKAnchorCrossesBreakTokens)
+    ("SpeechTrackingThreeCJKAnchorCrossesBreakTokens", testSpeechTrackingThreeCJKAnchorCrossesBreakTokens),
+    ("RecordingEditorPresentation", testRecordingEditorPresentation)
 ]
 
 do {

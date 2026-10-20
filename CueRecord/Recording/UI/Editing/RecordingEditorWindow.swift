@@ -16,10 +16,15 @@ final class RecordingEditorWindow: NSObject, NSWindowDelegate {
         onExportCameraOnly: @escaping (CapturedRecordingOutput, RecordingExportSettings) -> Void,
         onClose: @escaping () -> Void
     ) {
-        if let window {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
+        // A previous take may still own this window. Tear it down and rebuild, so the
+        // editor is always bound to the take the user just recorded instead of
+        // silently exporting the previous take.
+        if let existingWindow = window {
+            self.onClose = nil
+            existingWindow.contentView = nil
+            existingWindow.orderOut(nil)
+            existingWindow.close()
+            self.window = nil
         }
 
         self.onClose = onClose

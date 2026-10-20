@@ -36,6 +36,14 @@ final class RecordingController: ObservableObject {
     @Published private(set) var lastOutputURL: URL?
     @Published var lastError: String?
 
+    private struct QueuedRenderRequest {
+        let capturedOutput: CapturedRecordingOutput
+        let mode: RecordingRenderMode
+        let exportSettings: RecordingExportSettings
+    }
+
+    private var queuedRenderRequest: QueuedRenderRequest?
+
     var cameraManager: CameraManager {
         screenRecorder.getCameraManager()
     }
@@ -436,7 +444,16 @@ final class RecordingController: ObservableObject {
         mode: RecordingRenderMode,
         exportSettings: RecordingExportSettings = .default
     ) {
-        guard !isExporting else { return }
+        // Never drop an export request silently: keep the newest one and run it as soon as
+        // the current export finishes.
+        guard !isExporting else {
+            queuedRenderRequest = QueuedRenderRequest(
+                capturedOutput: capturedOutput,
+                mode: mode,
+                exportSettings: exportSettings
+            )
+            return
+        }
         if pendingCapturedRecording?.outputURL.standardizedFileURL == capturedOutput.outputURL.standardizedFileURL {
             pendingCapturedRecording = nil
         }
@@ -471,6 +488,14 @@ final class RecordingController: ObservableObject {
             lastOutputURL = result.finalOutputURL
             recordingLibraryChangeID = UUID()
             revealRecordingInFinder(result.finalOutputURL)
+            if let queued = queuedRenderRequest {
+                queuedRenderRequest = nil
+                renderCapturedRecording(
+                    queued.capturedOutput,
+                    mode: queued.mode,
+                    exportSettings: queued.exportSettings
+                )
+            }
         }
     }
 

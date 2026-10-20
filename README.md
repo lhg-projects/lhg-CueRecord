@@ -29,7 +29,9 @@
 
 ### 源码构建
 
-本仓库用 Git LFS 管理内置模型和原生库，先装 Git LFS 再拉代码：
+需要 **Xcode 16 或更高**（推荐最新 Xcode 26）——`xcodebuild` 只随 Xcode 提供，单独装 Command Line Tools 不够。
+
+本仓库用 Git LFS 管理内置模型和原生库（约 370 MB），先装 Git LFS 再拉代码：
 
 ```bash
 git lfs install
@@ -54,6 +56,27 @@ xcodebuild \
 ```bash
 scripts/run-recording-core-tests.sh
 ```
+
+### 本地自用构建（不需要开发者账号）
+
+只想自己装上用，走 ad-hoc 签名即可，不需要 Apple Developer 账号：
+
+```bash
+xcodebuild \
+  -project CueRecord.xcodeproj \
+  -scheme CueRecord \
+  -configuration Release \
+  -destination 'platform=macOS' \
+  CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO \
+  build
+
+open ~/Library/Developer/Xcode/DerivedData/CueRecord-*/Build/Products/Release/CueRecord.app
+```
+
+两点注意：
+
+- 本仓库的 Bundle ID 是 `com.lhg.cuerecord`，与上游官方包（`com.nolanlai.cuerecord`）**是两个独立 App**：可以和上游版本共存，但权限授权、偏好设置、Vault 路径都是各自独立的一套，首次启动要重新选 Vault 并重新授权。
+- ad-hoc 签名每次重新编译后 CDHash 会变，macOS 会把屏幕录制等权限视为新 App，需要到「系统设置 → 隐私与安全性」里重新勾选。
 
 ### 预编译包
 
@@ -100,5 +123,28 @@ build.sh                  签名 + 公证的发布 DMG 构建脚本
 
 - 本项目 fork 自 [nolangz/CueRecord](https://github.com/nolangz/CueRecord) v2.0.4，依 **Apache License 2.0** 二次开发；许可证原文见 [LICENSE](LICENSE)，上游版权声明保留。
 - 其中**提词器部分源自 [f/textream](https://github.com/f/textream)**（上游 Credits 已注明，此处沿袭标注）。
-- 本次整改范围：README 与项目元信息已按 lhg-projects 自有项目规范重写，去掉上游作者的个人品牌内容；**代码与上游 v2.0.4 保持一致**，后续功能迭代在本仓库进行。
+- 本次整改范围：README 与项目元信息已按 lhg-projects 自有项目规范重写，去掉上游作者的个人品牌内容。
+- 代码在上游 v2.0.4 基础上的改动见下方「本仓库改动记录」，逐条可回归。
 - 这是一个已发布的成熟项目，改动遵循上游 `AGENTS.md` 的约定：改动保持小而聚焦，每处改动测试受影响的区域后再算完成。
+
+## 本仓库改动记录
+
+### v2.1.0
+
+**修复：停止录制后成片经常不生成（只剩屏幕轨 + 摄像头轨两个文件）**
+
+根因是「录制结束后的剪辑导出窗口」用了全局布尔 + 单例窗口来判重，连续录第二、三条 take 时会被上一条残留的窗口挡掉，导出回调也没有任何提示：
+
+- `RecordingEditorWindow.show` 在窗口已存在时直接 `return`，不重新绑定新 take —— 点导出会导出上一条。
+- 该判重布尔在旧窗口未关闭时一直为真，导致后续 take 的编辑窗口整个不弹。
+- `RecordingController.renderCapturedRecording` 在导出进行中静默 `return`，请求直接丢失。
+
+改法（`RecordingEditorPresentation` + 三处调用点）：编辑窗口改为按 take 路径判定、`show` 复用窗口时重建绑定、导出请求改为排队执行而不丢弃、开始录制时先收起上一条残留的编辑窗口。
+
+**元信息与身份**
+
+- Bundle ID 改为 `com.lhg.cuerecord`；签名身份、Developer Team 改为本机/自有（不再依赖上游证书）。
+- 更新检查指向本仓库；帮助菜单链接、关于页署名改为本仓库与上游归属说明。
+- 版本号 2.1.0（build 7）。
+
+仍与上游共用的标识（故意保留，改了会打不开已有项目或丢失已保存的配置）：`cuerecord://` URL scheme、`.cuerecord` 项目元数据目录、`cuerecord/takeone/cueshot` 文档扩展名、`com.nolanlai.cuerecord.document` UTI、Keychain service `com.nolanlai.cuerecord.ai-provider`。

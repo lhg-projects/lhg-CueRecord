@@ -11,11 +11,18 @@ OUTPUT_DIR="$BUILD_DIR/universal"
 OUTPUT_APP="$OUTPUT_DIR/$APP_NAME"
 DMG_NAME="CueRecord.dmg"
 DMG_PATH="$BUILD_DIR/$DMG_NAME"
-TEAM_ID="${TEAM_ID:-JKDNYL5U42}"
-SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application: NUOLIN LAI (JKDNYL5U42)}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-cuerecord-notary}"
+TEAM_ID="${TEAM_ID:-}"
+SIGN_IDENTITY="${SIGN_IDENTITY:-}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-lhg-cuerecord-notary}"
 
-echo "🔎 Checking Developer ID identity…"
+echo "🔎 Checking release environment…"
+if [ -z "$TEAM_ID" ] || [ -z "$SIGN_IDENTITY" ]; then
+  echo "error: Set TEAM_ID and SIGN_IDENTITY for your own Developer ID before running build.sh."
+  echo "       TEAM_ID=XXXXXXXXXX SIGN_IDENTITY='Developer ID Application: YOUR NAME (XXXXXXXXXX)' ./build.sh"
+  echo "       For a local ad-hoc build, use xcodebuild with CODE_SIGN_IDENTITY=- instead."
+  exit 1
+fi
+
 if ! security find-identity -v -p codesigning | grep -F "$SIGN_IDENTITY" >/dev/null; then
   echo "error: Missing signing identity: $SIGN_IDENTITY"
   exit 1
