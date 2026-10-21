@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 final class RecordingPreviewBarWindow: NSObject {
     private var barWindow: NSWindow?
     private static let windowLevel: NSWindow.Level = .screenSaver + 2

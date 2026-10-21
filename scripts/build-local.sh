@@ -21,9 +21,14 @@ for arg in "$@"; do
   esac
 done
 
-# Prefer a full Xcode install without needing "sudo xcode-select".
-if [ -z "${DEVELOPER_DIR:-}" ] && [ -d /Applications/Xcode.app/Contents/Developer ]; then
-  export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+# Prefer a full Xcode install without needing "sudo xcode-select". Newest wins;
+# xcodes installs to /Applications/Xcode-<version>.app, App Store to Xcode.app.
+if [ -z "${DEVELOPER_DIR:-}" ]; then
+  for candidate in $(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V); do
+    if [ -x "$candidate/Contents/Developer/usr/bin/xcodebuild" ]; then
+      export DEVELOPER_DIR="$candidate/Contents/Developer"
+    fi
+  done
 fi
 
 if ! xcodebuild -version >/dev/null 2>&1; then

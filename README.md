@@ -136,6 +136,10 @@ build.sh                  签名 + 公证的发布 DMG 构建脚本
 
 改法（`RecordingEditorPresentation` + 三处调用点）：编辑窗口改为按 take 路径判定、`show` 复用窗口时重建绑定、导出请求改为排队执行而不丢弃、开始录制时先收起上一条残留的编辑窗口。
 
+**构建：Xcode 16.4 下的一个必要修正**
+
+`RecordingPreviewBarWindow` 没有标 `@MainActor`，却直接读 `RecordingController`（`@MainActor` 类）的 `currentRecordingInterfaceFrame`。Swift 6.1（Xcode 16.4）把这个隔离违规当错误处理，Release 构建直接失败——上游 2.0.4 的这个文件在本仓库未改动过，属于既有问题，不是本次修复引入的。加一行 `@MainActor` 即可，调用点全部在 `ContentView`（主线程）内。
+
 **元信息与身份**
 
 - Bundle ID 改为 `com.lhg.cuerecord`；签名身份、Developer Team 改为本机/自有（不再依赖上游证书）。
