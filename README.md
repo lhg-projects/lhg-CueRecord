@@ -62,16 +62,11 @@ scripts/run-recording-core-tests.sh
 只想自己装上用，走 ad-hoc 签名即可，不需要 Apple Developer 账号：
 
 ```bash
-xcodebuild \
-  -project CueRecord.xcodeproj \
-  -scheme CueRecord \
-  -configuration Release \
-  -destination 'platform=macOS' \
-  CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO \
-  build
-
-open ~/Library/Developer/Xcode/DerivedData/CueRecord-*/Build/Products/Release/CueRecord.app
+scripts/build-local.sh --install     # 构建并装到 ~/Applications/CueRecord.app
+scripts/build-local.sh               # 只构建
 ```
+
+脚本会先校验 Xcode 和 Git LFS 资产（缺少模型/原生库时直接报错，不会编出一个跑不起来的包），再用 `CODE_SIGN_IDENTITY=-` 构建 Release，`--install` 会把产物拷到 `~/Applications`。
 
 两点注意：
 
