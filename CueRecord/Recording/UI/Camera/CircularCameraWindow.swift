@@ -582,6 +582,7 @@ struct CameraOverlayView: View {
     }
     
     @State private var frameTickCount = 0
+    @State private var lastRenderedFrameStamp: UInt64 = .max
 
     private func updateCameraImage() {
         guard cameraManager.isCapturing,
@@ -593,6 +594,14 @@ struct CameraOverlayView: View {
         if frameTickCount % 300 == 0 {
             MemoryFootprint.log("摄像头浮窗渲染 \(frameTickCount) 帧")
         }
+
+        // 30fps 的刷新定时器比摄像头出帧快，同一帧会被重复渲染几十次。
+        // 只在真的有新帧时重建图像，既省 CPU 也避免 NSImage 堆积。
+        let frameStamp = cameraManager.receivedFrameCount
+        if frameStamp == lastRenderedFrameStamp, currentImage != nil {
+            return
+        }
+        lastRenderedFrameStamp = frameStamp
 
         let processedImage = CameraFrameProcessor.mirroredVisibleImage(from: pixelBuffer)
 

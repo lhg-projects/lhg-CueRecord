@@ -127,6 +127,9 @@ class ScreenRecorder: NSObject, ObservableObject {
     private var overlayMetadataSamples: [CameraOverlayMetadataSample] = []
     private let cameraCIContext = CIContext()
 
+    /// 设备 RGB 色彩空间：每帧创建一次是白费，做成共享。
+    static let sharedDeviceRGBColorSpace = CGColorSpaceCreateDeviceRGB()
+
     private nonisolated static let screenTargetFrameRate = 60
 
     private nonisolated static func rec709VideoColorProperties() -> [String: Any] {
@@ -1059,7 +1062,7 @@ class ScreenRecorder: NSObject, ObservableObject {
             scaledImage,
             to: outputPixelBuffer,
             bounds: outputExtent,
-            colorSpace: CGColorSpaceCreateDeviceRGB()
+            colorSpace: Self.sharedDeviceRGBColorSpace
         )
 
         return outputPixelBuffer
@@ -1454,41 +1457,54 @@ class ScreenRecorder: NSObject, ObservableObject {
             }
         }
 
+        // 每帧都会产生一批自动释放对象（CIImage、CGImage、渲染中间结果）。
+        // 没有 autoreleasepool 的话它们要等到整个导出结束才释放：
+        // 4K 一帧约 33 MB，几分钟的录像就能把内存推到几十 GB。
+        let renderColorSpace = CGColorSpaceCreateDeviceRGB()
+        var composedFrameCount = 0
+
         while let screenSample = screenOutput.copyNextSampleBuffer() {
             let screenTime = CMSampleBufferGetPresentationTimeStamp(screenSample)
-            advanceCameraFrame(to: screenTime)
 
-            guard let screenPixelBuffer = CMSampleBufferGetImageBuffer(screenSample),
-                  let outputPixelBuffer = Self.createPixelBuffer(from: adapter) else {
-                continue
+            autoreleasepool {
+                advanceCameraFrame(to: screenTime)
+
+                guard let screenPixelBuffer = CMSampleBufferGetImageBuffer(screenSample),
+                      let outputPixelBuffer = Self.createPixelBuffer(from: adapter) else {
+                    return
+                }
+
+                let screenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
+                let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
+                let seconds = max(0, CMTimeGetSeconds(screenTime))
+                let sample = Self.overlaySample(at: seconds, in: metadata.samples)
+                let composedImage = Self.composeScreenImage(
+                    screenImage,
+                    cameraImage: cameraImage,
+                    overlaySample: sample,
+                    metadata: metadata,
+                    outputExtent: outputExtent,
+                    maskCache: &maskCache
+                )
+
+                ciContext.render(
+                    composedImage,
+                    to: outputPixelBuffer,
+                    bounds: outputExtent,
+                    colorSpace: renderColorSpace
+                )
+
+                while !writerInput.isReadyForMoreMediaData {
+                    Thread.sleep(forTimeInterval: 0.002)
+                }
+
+                let presentationTime = screenTime.isValid ? screenTime : currentCameraTime
+                adapter.append(outputPixelBuffer, withPresentationTime: presentationTime)
+                composedFrameCount += 1
+                if composedFrameCount % 300 == 0 {
+                    MemoryFootprint.log("合成中（\(composedFrameCount) 帧）")
+                }
             }
-
-            let screenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
-            let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
-            let seconds = max(0, CMTimeGetSeconds(screenTime))
-            let sample = Self.overlaySample(at: seconds, in: metadata.samples)
-            let composedImage = Self.composeScreenImage(
-                screenImage,
-                cameraImage: cameraImage,
-                overlaySample: sample,
-                metadata: metadata,
-                outputExtent: outputExtent,
-                maskCache: &maskCache
-            )
-
-            ciContext.render(
-                composedImage,
-                to: outputPixelBuffer,
-                bounds: outputExtent,
-                colorSpace: CGColorSpaceCreateDeviceRGB()
-            )
-
-            while !writerInput.isReadyForMoreMediaData {
-                Thread.sleep(forTimeInterval: 0.002)
-            }
-
-            let presentationTime = screenTime.isValid ? screenTime : currentCameraTime
-            adapter.append(outputPixelBuffer, withPresentationTime: presentationTime)
         }
 
         writerInput.markAsFinished()
@@ -1625,56 +1641,70 @@ class ScreenRecorder: NSObject, ObservableObject {
             }
         }
 
+        enum FrameOutcome { case skip, proceed, stop }
+        let renderColorSpace = CGColorSpaceCreateDeviceRGB()
+        var editedFrameCount = 0
+
         while let screenSample = screenOutput.copyNextSampleBuffer() {
             let screenTime = CMSampleBufferGetPresentationTimeStamp(screenSample)
             let screenSeconds = CMTimeGetSeconds(screenTime)
-            guard screenSeconds.isFinite else { continue }
 
-            while cutIndex < resolvedCuts.count,
-                  screenSeconds >= resolvedCuts[cutIndex].endSeconds {
-                cutIndex += 1
+            let outcome: FrameOutcome = autoreleasepool {
+                guard screenSeconds.isFinite else { return .skip }
+
+                while cutIndex < resolvedCuts.count,
+                      screenSeconds >= resolvedCuts[cutIndex].endSeconds {
+                    cutIndex += 1
+                }
+
+                guard cutIndex < resolvedCuts.count else { return .stop }
+
+                let resolvedCut = resolvedCuts[cutIndex]
+                guard screenSeconds >= resolvedCut.startSeconds,
+                      screenSeconds <= resolvedCut.endSeconds else {
+                    return .skip
+                }
+
+                advanceCameraFrame(to: screenTime)
+
+                guard let screenPixelBuffer = CMSampleBufferGetImageBuffer(screenSample),
+                      let outputPixelBuffer = Self.createPixelBuffer(from: adapter) else {
+                    return .skip
+                }
+
+                let screenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
+                let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
+                let overlaySample = metadata.map { Self.overlaySample(at: screenSeconds, in: $0.samples) } ?? nil
+                let composedImage = Self.composeEditedImage(
+                    screenImage,
+                    cameraImage: cameraImage,
+                    cut: resolvedCut.cut,
+                    overlaySample: overlaySample,
+                    outputExtent: outputExtent,
+                    maskCache: &maskCache
+                )
+
+                ciContext.render(
+                    composedImage,
+                    to: outputPixelBuffer,
+                    bounds: outputExtent,
+                    colorSpace: renderColorSpace
+                )
+
+                while !writerInput.isReadyForMoreMediaData {
+                    Thread.sleep(forTimeInterval: 0.002)
+                }
+
+                let outputSeconds = resolvedCut.outputStartSeconds + (screenSeconds - resolvedCut.startSeconds)
+                adapter.append(outputPixelBuffer, withPresentationTime: CMTime(seconds: outputSeconds, preferredTimescale: 600))
+                editedFrameCount += 1
+                if editedFrameCount % 300 == 0 {
+                    MemoryFootprint.log("剪辑合成中（\(editedFrameCount) 帧）")
+                }
+                return .proceed
             }
 
-            guard cutIndex < resolvedCuts.count else { break }
-
-            let resolvedCut = resolvedCuts[cutIndex]
-            guard screenSeconds >= resolvedCut.startSeconds,
-                  screenSeconds <= resolvedCut.endSeconds else {
-                continue
-            }
-
-            advanceCameraFrame(to: screenTime)
-
-            guard let screenPixelBuffer = CMSampleBufferGetImageBuffer(screenSample),
-                  let outputPixelBuffer = Self.createPixelBuffer(from: adapter) else {
-                continue
-            }
-
-            let screenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
-            let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
-            let overlaySample = metadata.map { Self.overlaySample(at: screenSeconds, in: $0.samples) } ?? nil
-            let composedImage = Self.composeEditedImage(
-                screenImage,
-                cameraImage: cameraImage,
-                cut: resolvedCut.cut,
-                overlaySample: overlaySample,
-                outputExtent: outputExtent,
-                maskCache: &maskCache
-            )
-
-            ciContext.render(
-                composedImage,
-                to: outputPixelBuffer,
-                bounds: outputExtent,
-                colorSpace: CGColorSpaceCreateDeviceRGB()
-            )
-
-            while !writerInput.isReadyForMoreMediaData {
-                Thread.sleep(forTimeInterval: 0.002)
-            }
-
-            let outputSeconds = resolvedCut.outputStartSeconds + (screenSeconds - resolvedCut.startSeconds)
-            adapter.append(outputPixelBuffer, withPresentationTime: CMTime(seconds: outputSeconds, preferredTimescale: 600))
+            if outcome == .stop { break }
         }
 
         writerInput.markAsFinished()
@@ -1790,7 +1820,7 @@ class ScreenRecorder: NSObject, ObservableObject {
                 composedImage,
                 to: outputPixelBuffer,
                 bounds: outputExtent,
-                colorSpace: CGColorSpaceCreateDeviceRGB()
+                colorSpace: Self.sharedDeviceRGBColorSpace
             )
 
             while !writerInput.isReadyForMoreMediaData {
