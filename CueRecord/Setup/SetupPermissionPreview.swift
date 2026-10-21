@@ -9,35 +9,50 @@ struct ScreenPermissionPreview: View {
     @ObservedObject var permissionsManager: PermissionsManager
     let isBusy: Bool
     let request: () async -> Void
-    @State private var hasRequestedOnAppear = false
+    @State private var didRequest = false
 
     var body: some View {
-        HStack(spacing: 18) {
-            PermissionStatusBlock(
-                systemImage: "rectangle.dashed",
-                title: uiText(InterfaceLanguageSettings.shared.text("Screen and System Audio Recording")),
-                status: permissionsManager.screenRecordingAuthorized ? uiText(InterfaceLanguageSettings.shared.text("Granted")) : uiText(InterfaceLanguageSettings.shared.text("Not Granted")),
-                isGranted: permissionsManager.screenRecordingAuthorized
-            )
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 18) {
+                PermissionStatusBlock(
+                    systemImage: "rectangle.dashed",
+                    title: uiText(InterfaceLanguageSettings.shared.text("Screen and System Audio Recording")),
+                    status: permissionsManager.screenRecordingAuthorized ? uiText(InterfaceLanguageSettings.shared.text("Granted")) : uiText(InterfaceLanguageSettings.shared.text("Not Granted")),
+                    isGranted: permissionsManager.screenRecordingAuthorized
+                )
 
-            Spacer(minLength: 12)
+                Spacer(minLength: 12)
 
-            Button {
-                Task {
-                    await request()
+                Button {
+                    Task {
+                        didRequest = true
+                        await request()
+                    }
+                } label: {
+                    Text(isBusy ? uiText(InterfaceLanguageSettings.shared.text("Working")) : (permissionsManager.screenRecordingAuthorized ? uiText(InterfaceLanguageSettings.shared.text("Recheck")) : uiText(InterfaceLanguageSettings.shared.text("Authorize"))))
+                        .frame(width: 92)
                 }
-            } label: {
-                Text(isBusy ? uiText(InterfaceLanguageSettings.shared.text("Working")) : (permissionsManager.screenRecordingAuthorized ? uiText(InterfaceLanguageSettings.shared.text("Recheck")) : uiText(InterfaceLanguageSettings.shared.text("Authorize"))))
-                    .frame(width: 92)
+                .disabled(isBusy)
             }
-            .disabled(isBusy)
+
+            // 授权后系统只对「新启动的进程」生效，本进程再查还是未授权。
+            // 与其反复弹系统窗，不如直接给一条明确的出路。
+            if didRequest && !permissionsManager.screenRecordingAuthorized {
+                HStack(spacing: 10) {
+                    Text(uiText(InterfaceLanguageSettings.shared.text("Turned it on in System Settings? Restart the app for it to take effect.")))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button {
+                        permissionsManager.relaunchApplication()
+                    } label: {
+                        Text(uiText(InterfaceLanguageSettings.shared.text("Restart App")))
+                    }
+                }
+            }
         }
         .permissionPreviewPadding()
-        .task {
-            guard !hasRequestedOnAppear, !permissionsManager.screenRecordingAuthorized else { return }
-            hasRequestedOnAppear = true
-            await request()
-        }
     }
 }
 

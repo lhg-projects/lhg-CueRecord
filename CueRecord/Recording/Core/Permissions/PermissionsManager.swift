@@ -72,6 +72,11 @@ class PermissionsManager: ObservableObject {
         }
     }
     
+    /// 本次启动是否已经弹过系统的屏幕录制授权窗。
+    /// macOS 只认「授权后重启应用」的权限更新，同一个进程里反复请求只会反复弹窗，
+    /// 用户看到的就是「明明开了还在弹」。
+    private var hasPromptedScreenRecording = false
+
     func requestScreenRecordingPermission() async {
         print("📺 请求屏幕录制权限...")
         guard #available(macOS 12.3, *) else {
@@ -80,12 +85,19 @@ class PermissionsManager: ObservableObject {
             return
         }
 
-        prepareForScreenRecordingPrompt()
-
         if CGPreflightScreenCaptureAccess() {
             await checkScreenRecordingPermission()
             return
         }
+
+        if hasPromptedScreenRecording {
+            print("📺 本次启动已请求过；系统开关需要重启应用才生效，不再重复弹窗")
+            await checkScreenRecordingPermission()
+            return
+        }
+        hasPromptedScreenRecording = true
+
+        prepareForScreenRecordingPrompt()
 
         await triggerScreenCaptureKitPermissionProbe(reason: "pre-request")
         if CGPreflightScreenCaptureAccess() {
@@ -174,6 +186,23 @@ class PermissionsManager: ObservableObject {
         await checkScreenRecordingPermission()
     }
     
+    /// 屏幕录制授权后，当前进程拿不到新的权限状态，必须重启应用。
+    /// 由用户点一下，比干等或反复弹窗可控。
+    func relaunchApplication() {
+        let bundleURL = Bundle.main.bundleURL
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: bundleURL, configuration: configuration) { _, error in
+            if let error {
+                print("⚠️  重启应用失败: \(error.localizedDescription)")
+                return
+            }
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
+        }
+    }
+
     private func openScreenRecordingSettings() {
         let urls = [
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",

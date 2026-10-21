@@ -47,6 +47,8 @@ final class InterfaceLanguageSettings: ObservableObject {
     }
 
     private static let zhHans: [String: String] = [
+        "Turned it on in System Settings? Restart the app for it to take effect.": "已经在系统设置里打开了？重启应用才生效。",
+        "Restart App": "重启应用",
         "Background": "背景",
         "Solid": "实心",
         "Blur": "虚化",

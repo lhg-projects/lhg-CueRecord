@@ -124,7 +124,7 @@ Next:
     /Applications/CueRecord.app you installed from upstream. Both can coexist.
   - First launch: pick your vault folder again, then re-grant Screen Recording,
     Microphone, Camera and System Audio.
-  - After every rebuild the ad-hoc signature changes and macOS treats it as a new
-    app, so expect to re-grant Screen Recording each time.
+  - The code requirement is pinned to the bundle id, so permissions you grant
+    once (Screen Recording, Microphone, Camera) survive later rebuilds.
 MSG
 fi
