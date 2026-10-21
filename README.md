@@ -124,6 +124,12 @@ build.sh                  签名 + 公证的发布 DMG 构建脚本
 
 ## 本仓库改动记录
 
+### v2.2.1（浮窗背景三档 + 启动崩溃修复）
+
+- 提词器浮窗背景从「透明开关」升级为三档：**实心 / 虚化 / 全透明**。全透明模式不画底板、不画毛玻璃，只画文字，并在文字上叠一圈暗影，保证浅色文档背景上仍然可读。
+- 修复一个启动即崩的缺陷：本地化词条表里 `Background` 键重复，Swift 字典字面量重复 key 会在运行时 trap。已去重，并加回归测试 `LocalizationDictionaryHasNoDuplicateKeys`。
+- 版本号 2.2.0（build 8）。
+
 ### v2.2.0（品牌化）
 
 - 产品改名 **刘老师 · 录课台**：`PRODUCT_NAME=LLSStudio`（产物 `LLSStudio.app`），显示名走 `CFBundleDisplayName`，Finder / Dock / 菜单栏 / 关于页统一。

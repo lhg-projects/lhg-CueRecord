@@ -158,9 +158,9 @@ struct NotchPreviewContent: View {
 
             ZStack(alignment: .top) {
                 // Shape: concave corners flatten via cornerPhase, then cross-fade to rounded via offsetPhase
-                let isTransparent = settings.overlayTransparency && settings.overlayMode == .pinned
+                let previewBackgroundMode = settings.overlayMode == .pinned ? settings.overlayBackgroundMode : OverlayBackgroundMode.solid
                 Group {
-                    if isTransparent {
+                    if previewBackgroundMode == .blur {
                         ZStack {
                             NotchBlurView()
                             DynamicIslandShape(
@@ -173,7 +173,7 @@ struct NotchPreviewContent: View {
                             topInset: 16 * (1 - cornerPhase),
                             bottomRadius: 18
                         ))
-                    } else {
+                    } else if previewBackgroundMode == .solid {
                         DynamicIslandShape(
                             topInset: 16 * (1 - cornerPhase),
                             bottomRadius: 18
@@ -903,18 +903,27 @@ struct SettingsView: View {
 
                     Divider()
 
-                    Toggle(isOn: $settings.overlayTransparency) {
-                        Text(t("Transparency"))
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(t("Background"))
                             .font(.system(size: 13, weight: .medium))
+                        Picker("", selection: $settings.overlayBackgroundMode) {
+                            ForEach(OverlayBackgroundMode.allCases) { mode in
+                                Text(mode.localizedLabel).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
                     }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
 
-                    Text(t("Makes the overlay see-through so desktop content shows through."))
+                    Text(settings.overlayBackgroundMode == .clear
+                         ? t("Only the text is drawn. Nothing covers the screen behind it.")
+                         : settings.overlayBackgroundMode == .blur
+                         ? t("Blurred glass you can see through.")
+                         : t("Solid background."))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
 
-                    if settings.overlayTransparency {
+                    if settings.overlayBackgroundMode == .blur {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text(t("Amount"))
@@ -1648,6 +1657,7 @@ struct SettingsView: View {
         settings.pinnedScreenID = 0
         settings.floatingGlassEffect = false
         settings.glassOpacity = 0.15
+        settings.overlayBackgroundMode = .solid
         settings.overlayTransparency = false
         settings.overlayTransparencyOpacity = 0.85
         settings.followCursorWhenUndocked = false

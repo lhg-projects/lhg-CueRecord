@@ -550,6 +550,22 @@ struct TeleprompterBackdropView: View {
 
 // MARK: - Settings
 
+enum OverlayBackgroundMode: String, CaseIterable, Identifiable {
+    case solid
+    case blur
+    case clear
+
+    var id: String { rawValue }
+
+    var localizedLabel: String {
+        switch self {
+        case .solid: return InterfaceLanguageSettings.shared.text("Solid")
+        case .blur: return InterfaceLanguageSettings.shared.text("Blur")
+        case .clear: return InterfaceLanguageSettings.shared.text("Clear")
+        }
+    }
+}
+
 @Observable
 class NotchSettings {
     static let shared = NotchSettings()
@@ -643,6 +659,11 @@ class NotchSettings {
 
     var glassOpacity: Double {
         didSet { UserDefaults.standard.set(glassOpacity, forKey: "glassOpacity") }
+    }
+
+    /// 提词器浮窗的背景样式。全透明模式下只画文字，不画任何底板。
+    var overlayBackgroundMode: OverlayBackgroundMode {
+        didSet { UserDefaults.standard.set(overlayBackgroundMode.rawValue, forKey: "overlayBackgroundMode") }
     }
 
     var overlayTransparency: Bool {
@@ -830,6 +851,13 @@ class NotchSettings {
         let savedOpacity = UserDefaults.standard.double(forKey: "glassOpacity")
         self.glassOpacity = savedOpacity > 0 ? savedOpacity : 0.15
         self.overlayTransparency = UserDefaults.standard.object(forKey: "overlayTransparency") as? Bool ?? false
+        if let savedMode = UserDefaults.standard.string(forKey: "overlayBackgroundMode"),
+           let mode = OverlayBackgroundMode(rawValue: savedMode) {
+            self.overlayBackgroundMode = mode
+        } else {
+            // 老版本只有「透明」开关：开着就当虚化，关着当实心
+            self.overlayBackgroundMode = (UserDefaults.standard.object(forKey: "overlayTransparency") as? Bool ?? false) ? .blur : .solid
+        }
         let savedTransparencyOpacity = UserDefaults.standard.double(forKey: "overlayTransparencyOpacity")
         self.overlayTransparencyOpacity = savedTransparencyOpacity > 0 ? savedTransparencyOpacity : 0.85
         self.followCursorWhenUndocked = UserDefaults.standard.object(forKey: "followCursorWhenUndocked") as? Bool ?? false

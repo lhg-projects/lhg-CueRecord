@@ -47,6 +47,13 @@ final class InterfaceLanguageSettings: ObservableObject {
     }
 
     private static let zhHans: [String: String] = [
+        "Background": "背景",
+        "Solid": "实心",
+        "Blur": "虚化",
+        "Clear": "全透明",
+        "Only the text is drawn. Nothing covers the screen behind it.": "只画文字，背后什么都不盖。",
+        "Blurred glass you can see through.": "毛玻璃虚化，能看见背后的画面。",
+        "Solid background.": "不透明底板。",
         "Voice AI": "语音 AI",
         "Voice commands": "语音口令",
         "Say “next page”, “pause” or “finish recording” to control the teleprompter.": "说「下一页」「暂停」「结束录制」直接控制提词器滚动。",
@@ -190,7 +197,6 @@ final class InterfaceLanguageSettings: ObservableObject {
         "Amount": "程度",
         "More transparent": "更透明",
         "Less transparent": "更不透明",
-        "Background": "背景",
         "No background is shown behind the teleprompter text.": "提词器文字后方不显示背景。",
         "Use your own image behind the teleprompter text.": "在提词器文字后方使用你自己的图片。",
         "Custom Image": "自定义图片",

@@ -590,6 +590,36 @@ func testAIVoiceCommandParsing() throws {
                "低置信度应丢弃")
 }
 
+
+func testLocalizationDictionaryHasNoDuplicateKeys() throws {
+    // 词条表是字典字面量：重复 key 不会编译报错，但运行时会 trap（曾导致启动即崩）
+    let repoRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let source = repoRoot.appendingPathComponent("CueRecord/InterfaceLanguage.swift")
+    let text = try String(contentsOf: source, encoding: .utf8)
+
+    guard let start = text.range(of: "private static let zhHans: [String: String] = ["),
+          let end = text.range(of: "\n    ]", range: start.upperBound..<text.endIndex)
+    else {
+        throw TestFailure.failed("找不到 zhHans 词条表")
+    }
+    let block = text[start.upperBound..<end.lowerBound]
+
+    var seen = Set<String>()
+    var duplicates: [String] = []
+    for line in block.split(separator: "\n") {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("\""), let colon = trimmed.firstIndex(of: ":") else { continue }
+        let key = String(trimmed[trimmed.index(after: trimmed.startIndex)..<colon])
+        if !seen.insert(key).inserted {
+            duplicates.append(key)
+        }
+    }
+    try expect(duplicates.isEmpty, "词条表里有重复 key：\(duplicates.joined(separator: ", "))")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -610,7 +640,8 @@ let tests: [(String, () throws -> Void)] = [
     ("SpeechTrackingThreeWordAnchorCrossesLineBreaks", testSpeechTrackingThreeWordAnchorCrossesLineBreaks),
     ("SpeechTrackingThreeCJKAnchorCrossesBreakTokens", testSpeechTrackingThreeCJKAnchorCrossesBreakTokens),
     ("RecordingEditorPresentation", testRecordingEditorPresentation),
-    ("AIVoiceCommandParsing", testAIVoiceCommandParsing)
+    ("AIVoiceCommandParsing", testAIVoiceCommandParsing),
+    ("LocalizationDictionaryHasNoDuplicateKeys", testLocalizationDictionaryHasNoDuplicateKeys)
 ]
 
 do {

@@ -766,10 +766,10 @@ struct NotchOverlayView: View {
 
             ZStack(alignment: .top) {
                 // Container shape — solid black or transparent with blur
-                let isTransparent = NotchSettings.shared.overlayTransparency
+                let backgroundMode = NotchSettings.shared.overlayBackgroundMode
                 let transparencyOpacity = NotchSettings.shared.overlayTransparencyOpacity
 
-                if isTransparent {
+                if backgroundMode == .blur {
                     // Blurred background layer clipped to the Dynamic Island shape
                     NotchBlurView()
                         .clipShape(DynamicIslandShape(
@@ -785,7 +785,7 @@ struct NotchOverlayView: View {
                     )
                     .fill(.black.opacity(1.0 - transparencyOpacity))
                     .frame(width: currentWidth, height: currentHeight)
-                } else {
+                } else if backgroundMode == .solid {
                     DynamicIslandShape(
                         topInset: currentTopInset,
                         bottomRadius: currentBottomRadius
@@ -796,6 +796,7 @@ struct NotchOverlayView: View {
 
                 TeleprompterBackdropView(settings: NotchSettings.shared, audienceFaceOpacity: 0.18)
                     .frame(width: currentWidth, height: currentHeight)
+                    .opacity(backgroundMode == .clear ? 0 : 1)
                     .clipShape(DynamicIslandShape(
                         topInset: currentTopInset,
                         bottomRadius: currentBottomRadius
@@ -815,6 +816,11 @@ struct NotchOverlayView: View {
                     .padding(.horizontal, topInset)
                     .frame(width: currentWidth, height: targetHeight)
                     .clipped()
+                    // 全透明模式下没有底板托底，靠一圈暗影保证文字在任何壁纸/文档上都读得清
+                    .shadow(
+                        color: backgroundMode == .clear ? .black.opacity(0.9) : .clear,
+                        radius: backgroundMode == .clear ? 3 : 0
+                    )
                     .transition(.opacity)
                 }
             }
@@ -1355,7 +1361,9 @@ struct FloatingOverlayView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             Group {
-                if NotchSettings.shared.floatingGlassEffect {
+                if NotchSettings.shared.overlayBackgroundMode == .clear {
+                    Color.clear
+                } else if NotchSettings.shared.overlayBackgroundMode == .blur || NotchSettings.shared.floatingGlassEffect {
                     ZStack {
                         GlassEffectView()
                         RoundedRectangle(cornerRadius: 16)
