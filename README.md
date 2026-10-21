@@ -124,7 +124,13 @@ build.sh                  签名 + 公证的发布 DMG 构建脚本
 
 ## 本仓库改动记录
 
-### v2.2.1（浮窗背景三档 + 启动崩溃修复）
+### v2.2.1（权限修复 + 浮窗背景三档 + 启动崩溃修复）
+
+- **修复「授权了还一直要授权」**：ad-hoc 签名的代码要求原本是自身 cdhash，每次重新构建都变，macOS 会把新包当成另一个应用，已有的屏幕录制/摄像头/麦克风授权全部失效。现在构建脚本会重签并固定代码要求为 bundle id，授权一次长期有效。
+- **修复摄像头打不开**：Release 构建此前用 `CODE_SIGNING_REQUIRED=NO`，entitlements 从没真正签进包，hardened runtime 下系统直接抑制摄像头弹窗。现在正常签名并带上 camera / audio-input / disable-library-validation。
+- **修复摄像头窗一直黑着**：系统状态是 notDetermined 时应用只查不请求，永远不会弹窗。现在首次使用会主动请求授权。
+- 麦克风授权说明改为中文。
+
 
 - 提词器浮窗背景从「透明开关」升级为三档：**实心 / 虚化 / 全透明**。全透明模式不画底板、不画毛玻璃，只画文字，并在文字上叠一圈暗影，保证浅色文档背景上仍然可读。
 - 修复一个启动即崩的缺陷：本地化词条表里 `Background` 键重复，Swift 字典字面量重复 key 会在运行时 trap。已去重，并加回归测试 `LocalizationDictionaryHasNoDuplicateKeys`。

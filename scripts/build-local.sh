@@ -79,7 +79,8 @@ xcodebuild \
   -derivedDataPath "$DD" \
   -destination 'platform=macOS' \
   CODE_SIGN_IDENTITY=- \
-  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_ENTITLEMENTS=CueRecord/CueRecord.entitlements \
+  ENABLE_HARDENED_RUNTIME=YES \
   build
 
 PRODUCT="$(ls -d "$DD"/Build/Products/Release/*.app 2>/dev/null | head -1)"
@@ -89,8 +90,23 @@ if [ -z "$PRODUCT" ] || [ ! -d "$PRODUCT" ]; then
 fi
 APP_BASENAME="$(basename "$PRODUCT")"
 
+# ad-hoc 签名的默认「代码要求」是它自己的 cdhash，每次重新构建都会变。
+# 对 TCC 来说那就是另一个应用，用户已经勾过的屏幕录制/摄像头/麦克风全部作废、
+# 每次启动都重新弹窗。这里重签一次，把代码要求固定成 bundle id，
+# 这样跨构建稳定，权限只授权一次就够。
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PRODUCT/Contents/Info.plist")"
+echo "🖋  Re-signing with a stable designated requirement ($BUNDLE_ID)…"
+codesign --force --sign - \
+  --identifier "$BUNDLE_ID" \
+  -r="designated => identifier \"$BUNDLE_ID\"" \
+  --entitlements "$ROOT/CueRecord/CueRecord.entitlements" \
+  --options runtime \
+  "$PRODUCT"
+codesign --verify --strict "$PRODUCT"
+
 echo "✅ Built: $PRODUCT"
 codesign -dv "$PRODUCT" 2>&1 | sed -n '1,3p'
+codesign -d -r- "$PRODUCT" 2>&1 | tail -1
 
 if [ "$INSTALL" -eq 1 ]; then
   mkdir -p "$INSTALL_DIR"

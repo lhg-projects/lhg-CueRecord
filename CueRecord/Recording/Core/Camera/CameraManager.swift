@@ -111,6 +111,29 @@ class CameraManager: NSObject, ObservableObject {
 
         isAvailable = (authStatus == .authorized) && hasCamera
         print("📷 摄像头可用性: \(isAvailable) (权限: \(authStatus.rawValue), 设备: \(hasCamera))")
+
+        // 首次使用系统状态是 notDetermined。只查不请求的话，系统永远不会弹窗，
+        // 摄像头窗口会一直黑着，用户看到的就是「没有摄像头权限」。
+        if authStatus == .notDetermined && hasCamera {
+            requestVideoAccessIfNeeded()
+        }
+    }
+
+    private var hasRequestedVideoAccess = false
+
+    private func requestVideoAccessIfNeeded() {
+        guard !hasRequestedVideoAccess else { return }
+        hasRequestedVideoAccess = true
+        print("📷 请求摄像头权限（首次使用）...")
+        Task { @MainActor [weak self] in
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            print("📷 摄像头权限请求结果: \(granted ? "已授权" : "被拒绝")")
+            guard let self else { return }
+            self.refreshCameraDevices()
+            if granted {
+                NotificationCenter.default.post(name: .cameraAuthorizationGranted, object: nil)
+            }
+        }
     }
 
     func refreshCameraDevices() {

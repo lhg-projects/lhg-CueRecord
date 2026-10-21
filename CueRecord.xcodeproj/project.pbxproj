@@ -281,7 +281,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -296,12 +296,12 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "刘老师 · 录课台";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "CueRecord needs microphone access to listen to your speech and highlight words as you read them.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "录课台需要麦克风权限，才能听你说话并跟着你的语速滚动提词。";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Vendor/SherpaOnnxShared/lib/libsherpa-onnx-c-api.dylib",
@@ -329,7 +329,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -344,12 +344,12 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "刘老师 · 录课台";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "CueRecord needs microphone access to listen to your speech and highlight words as you read them.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "录课台需要麦克风权限，才能听你说话并跟着你的语速滚动提词。";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Vendor/SherpaOnnxShared/lib/libsherpa-onnx-c-api.dylib",

@@ -11,6 +11,7 @@ private let supportedCueRecordFileExtensions: Set<String> = ["md", "cuerecord", 
 extension Notification.Name {
     static let openSettings = Notification.Name("openSettings")
     static let openAbout = Notification.Name("openAbout")
+    static let cameraAuthorizationGranted = Notification.Name("cameraAuthorizationGranted")
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
