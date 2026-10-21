@@ -176,20 +176,24 @@ func testRecordingPixelFormatPolicy() throws {
 }
 
 func testRecordingExportSettings() throws {
+    // 默认导出改成 1080p：录课够用，导出帧缓冲只有 4K 的四分之一
     let defaultSettings = RecordingExportSettings.default
-    try expect(defaultSettings.resolutionPreset == .p4K, "Default export resolution should be 4K")
+    try expect(defaultSettings.resolutionPreset == .p1080, "Default export resolution should be 1080p")
     try expect(defaultSettings.bitRatePreset == .medium, "Default export bitrate should be medium")
 
     let fiveKSize = CGSize(width: 5120, height: 2880)
     let defaultOutputSize = defaultSettings.outputSize(for: fiveKSize)
-    try expect(defaultOutputSize == CGSize(width: 3840, height: 2160), "4K export should cap 5K landscape sources at 3840 x 2160")
-    try expect(defaultSettings.outputDimensionsText(for: fiveKSize) == "3840 x 2160", "Expected dimensions text should match the 4K output size")
+    try expect(defaultOutputSize == CGSize(width: 1920, height: 1080), "1080p export should cap 5K landscape sources at 1920 x 1080")
+    try expect(defaultSettings.outputDimensionsText(for: fiveKSize) == "1920 x 1080", "Expected dimensions text should match the 1080p output size")
 
     let portraitOutputSize = defaultSettings.outputSize(for: CGSize(width: 2880, height: 5120))
-    try expect(portraitOutputSize == CGSize(width: 2160, height: 3840), "4K export should preserve portrait aspect ratio")
+    try expect(portraitOutputSize == CGSize(width: 1080, height: 1920), "1080p export should preserve portrait aspect ratio")
 
     let smallSourceSize = CGSize(width: 1280, height: 720)
-    try expect(defaultSettings.outputSize(for: smallSourceSize) == smallSourceSize, "4K export should not upscale smaller sources")
+    try expect(defaultSettings.outputSize(for: smallSourceSize) == smallSourceSize, "1080p export should not upscale smaller sources")
+
+    let fourKSettings = RecordingExportSettings(resolutionPreset: .p4K, bitRatePreset: .medium)
+    try expect(fourKSettings.outputSize(for: fiveKSize) == CGSize(width: 3840, height: 2160), "4K preset should still cap landscape sources at 3840 x 2160")
 
     let hdSettings = RecordingExportSettings(resolutionPreset: .p1080, bitRatePreset: .low)
     try expect(hdSettings.outputSize(for: fiveKSize) == CGSize(width: 1920, height: 1080), "1080p export should cap landscape sources at 1920 x 1080")

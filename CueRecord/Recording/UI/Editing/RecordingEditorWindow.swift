@@ -457,7 +457,8 @@ private struct RecordingEditorView: View {
 
     @State private var timelineHeight: CGFloat = 260
     @State private var timelineResizeStartHeight: CGFloat?
-    @State private var exportResolutionPreset: RecordingExportResolutionPreset = .p4K
+    // 默认 1080p：录课够用，导出内存与耗时都是 4K 的四分之一
+    @State private var exportResolutionPreset: RecordingExportResolutionPreset = .p1080
     @State private var exportBitRatePreset: RecordingExportBitRatePreset = .medium
 
     private let minimumTimelineHeight: CGFloat = 190

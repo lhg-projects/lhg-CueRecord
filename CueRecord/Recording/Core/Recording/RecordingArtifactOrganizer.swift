@@ -119,7 +119,7 @@ nonisolated struct RecordingExportSettings: Equatable, Sendable {
     var bitRatePreset: RecordingExportBitRatePreset
 
     static let `default` = RecordingExportSettings(
-        resolutionPreset: .p4K,
+        resolutionPreset: .p1080,
         bitRatePreset: .medium
     )
 
