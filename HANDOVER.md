@@ -257,3 +257,41 @@ defaults write com.liulaoshi.llsstudio overlayBackgroundMode -string clear
 1. `git lfs pull`，然后跑一次 `./scripts/run-recording-core-tests.sh` 和 `./scripts/build-local.sh --install`，确认基线是绿的。
 2. 用 `open --env NSUnbufferedIO=YES --stdout ...` 启动，录一条 30 秒的测试，看 `_composited.mov` 能不能导出来。这是这个软件的核心价值，坏了其他都白搭。
 3. 复现用户报告的问题时，先看 `📷📺🔐` 三类日志，再看 `tccd` 日志，最后才怀疑业务代码——过去两天里，权限与签名问题占了全部故障的七成。
+
+---
+
+## 10. 未解决问题：录制结束时内存暴涨（2026-10-22 报障）
+
+**现象**：用户录完一条视频后，系统弹「应用程序内存不足」，活动监视器显示本应用占用 **75.39 GB**。
+
+**已排除**（静态排查 + 实测）：
+
+| 嫌疑 | 结论 |
+|---|---|
+| `CameraFrameBuffer` | 容量 8 的有界队列，不是 |
+| `pendingAudioBuffers` | 上限 48，超出即丢弃，不是 |
+| 摄像头写入路径 | `isReadyForMoreMediaData` 未就绪即丢帧，有界 |
+| 导出合成循环 | 同样检查就绪状态，且 `alwaysCopiesSampleData = false`，不是 |
+| 摄像头浮窗每帧新建 `CIContext` | **确有浪费**（900 帧约涨 37 MB），已改为共用 `CameraFrameProcessor.sharedContext`，但这个量级解释不了 75 GB |
+
+**75 GB 的量级推算**：4K BGRA 一帧约 33 MB，75 GB ≈ 2300 帧 ≈ 30fps 下 77 秒的帧堆在内存里。指向「某个队列在积压」或「某个大缓冲被复用失败」，而不是逐帧小对象泄漏。
+
+**已埋好的探针**（`CueRecord/Support/MemoryFootprint.swift`，输出 `📊 标签: xx MB`）：
+
+- `录制 开始` / `录制 停止（停止前）`
+- `后处理/导出 开始 (状态文案)` / `后处理/导出 完成`
+- `录制中（每 600 帧）`
+- `摄像头浮窗渲染（每 300 帧）`
+
+**复现方式**（必须拿到这段日志才能定位）：
+
+```bash
+pkill -f "LLSStudio.app/Contents/MacOS/LLSStudio"
+open --env NSUnbufferedIO=YES --stdout /tmp/mem.log --stderr /tmp/mem.log ~/Applications/LLSStudio.app
+# 录一条 2 分钟，带上摄像头浮窗，正常停止
+grep -a "📊" /tmp/mem.log
+```
+
+判断方法：看 `录制 停止` 前后到 `后处理 完成` 之间的跳变。如果涨在「录制中」，是采集/编码队列积压；如果涨在「后处理」阶段，是导出链路的缓冲问题。
+
+**下一步建议**：拿到日志后，在 `ScreenRecorder.appendScreenFrame` 与 `renderEditedVideo` 两处各加一次 `MemoryFootprint.log`，把范围收敛到函数级。

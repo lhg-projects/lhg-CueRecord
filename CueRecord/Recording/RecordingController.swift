@@ -379,6 +379,7 @@ final class RecordingController: ObservableObject {
         }
 
         isStopping = true
+        MemoryFootprint.log("录制 停止（停止前）")
         stopRecordingTimer()
         stopSelectedWindowTracking()
         recordingIndicator.hideIndicator()
@@ -480,9 +481,11 @@ final class RecordingController: ObservableObject {
     private func handleRecordingPostProcessingEvent(_ event: RecordingPostProcessingEvent) {
         switch event {
         case .started(_, let mode):
+            MemoryFootprint.log("后处理/导出 开始 (\(mode.statusText))")
             isExporting = true
             exportStatusText = uiText(mode.statusText)
         case .completed(let result):
+            MemoryFootprint.log("后处理/导出 完成")
             isExporting = false
             exportStatusText = nil
             lastOutputURL = result.finalOutputURL
@@ -561,6 +564,7 @@ final class RecordingController: ObservableObject {
                 )
 
                 showRecordingOverlays()
+                MemoryFootprint.log("录制 开始")
                 completion?(true)
             } catch {
                 recordingState.stopRecording()

@@ -4,6 +4,10 @@ import CoreVideo
 import Foundation
 
 enum CameraFrameProcessor {
+    /// 共用一个 CIContext。摄像头浮窗 30fps 渲染曾是「每帧 new 一个」，
+    /// 这是 Core Image 的经典漏：每次构造都会占住 Metal/CoreImage 资源。
+    static let sharedContext = CIContext(options: [.cacheIntermediates: false])
+
     static func mirroredVisibleImage(from pixelBuffer: CVPixelBuffer) -> (image: CIImage, extent: CGRect) {
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         let cropRect = visibleContentRect(in: pixelBuffer, imageExtent: ciImage.extent)

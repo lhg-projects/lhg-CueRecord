@@ -581,10 +581,17 @@ struct CameraOverlayView: View {
             .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
     }
     
+    @State private var frameTickCount = 0
+
     private func updateCameraImage() {
         guard cameraManager.isCapturing,
               let pixelBuffer = cameraManager.getCurrentFrame() else {
             return
+        }
+
+        frameTickCount += 1
+        if frameTickCount % 300 == 0 {
+            MemoryFootprint.log("摄像头浮窗渲染 \(frameTickCount) 帧")
         }
 
         let processedImage = CameraFrameProcessor.mirroredVisibleImage(from: pixelBuffer)
@@ -596,9 +603,8 @@ struct CameraOverlayView: View {
             }
         }
         
-        // 转换CVPixelBuffer到NSImage
-        let context = CIContext()
-        if let cgImage = context.createCGImage(processedImage.image, from: processedImage.extent) {
+        // 转换CVPixelBuffer到NSImage（复用共享 CIContext，不要每帧新建）
+        if let cgImage = CameraFrameProcessor.sharedContext.createCGImage(processedImage.image, from: processedImage.extent) {
             currentImage = NSImage(cgImage: cgImage, size: processedImage.extent.size)
         }
     }

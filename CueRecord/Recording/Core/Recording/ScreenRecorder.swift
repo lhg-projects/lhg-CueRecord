@@ -904,6 +904,8 @@ class ScreenRecorder: NSObject, ObservableObject {
         print("📷 独立摄像头视频轨开始: \(cameraOutputURL?.lastPathComponent ?? "")")
     }
 
+    private var recordedFrameCount = 0
+
     private func appendCameraFrame(_ frame: CameraFrameSample) {
         guard let videoStartTime = firstVideoFrameTime else { return }
 
@@ -964,6 +966,10 @@ class ScreenRecorder: NSObject, ObservableObject {
 
         if adapter.append(outputPixelBuffer, withPresentationTime: presentationTime) {
             cameraFrameCount += 1
+            recordedFrameCount += 1
+            if recordedFrameCount % 600 == 0 {
+                MemoryFootprint.log("录制中（\(recordedFrameCount) 帧）")
+            }
             recordingMetrics.updateCamera(
                 received: cameraManager.receivedFrameCount,
                 written: cameraFrameCount,
