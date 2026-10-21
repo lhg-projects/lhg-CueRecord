@@ -615,7 +615,7 @@ class CueRecordService: NSObject, ObservableObject {
             loadProject(at: currentProjectIndex)
         } catch {
             let alert = NSAlert()
-            alert.messageText = uiText("Failed to open 录课台 workspace")
+            alert.messageText = uiText(InterfaceLanguageSettings.shared.text("Failed to open 录课台 workspace"))
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
@@ -641,7 +641,7 @@ class CueRecordService: NSObject, ObservableObject {
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
         } catch {
             let alert = NSAlert()
-            alert.messageText = uiText("Failed to save file")
+            alert.messageText = uiText(InterfaceLanguageSettings.shared.text("Failed to save file"))
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
@@ -665,7 +665,7 @@ class CueRecordService: NSObject, ObservableObject {
             } catch {
                 DispatchQueue.main.async {
                     let alert = NSAlert()
-                    alert.messageText = uiText("Import Error")
+                    alert.messageText = uiText(InterfaceLanguageSettings.shared.text("Import Error"))
                     alert.informativeText = error.localizedDescription
                     alert.runModal()
                 }
@@ -724,7 +724,7 @@ class CueRecordService: NSObject, ObservableObject {
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
         } catch {
             let alert = NSAlert()
-            alert.messageText = uiText("Failed to open file")
+            alert.messageText = uiText(InterfaceLanguageSettings.shared.text("Failed to open file"))
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }

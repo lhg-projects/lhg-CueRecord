@@ -240,6 +240,56 @@ struct AIChatCompletionsClient {
         return content
     }
 
+    /// 通用一次性补全：给语音口令、改写等小任务复用同一套 provider / 密钥 / 请求管线。
+    func complete(
+        systemPrompt: String,
+        userPrompt: String,
+        model configuration: AIChatModelConfiguration,
+        apiKey: String?,
+        temperature: Double = 0,
+        timeout: TimeInterval = 20
+    ) async throws -> String {
+        let trimmedKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if configuration.requiresAPIKey && trimmedKey.isEmpty {
+            throw AIScriptError.invalidAPIKey
+        }
+
+        var urlRequest = URLRequest(url: configuration.endpoint)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !trimmedKey.isEmpty {
+            urlRequest.setValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
+        }
+        urlRequest.timeoutInterval = timeout
+
+        let body = ChatCompletionsRequest(
+            model: configuration.modelID,
+            messages: [
+                .init(role: "system", content: systemPrompt),
+                .init(role: "user", content: userPrompt)
+            ],
+            temperature: temperature,
+            stream: false
+        )
+        urlRequest.httpBody = try JSONEncoder.chatCompletionsEncoder.encode(body)
+
+        let (data, response) = try await session.data(for: urlRequest)
+        if let httpResponse = response as? HTTPURLResponse, !(200..<300).contains(httpResponse.statusCode) {
+            if let errorResponse = try? JSONDecoder().decode(ChatCompletionsErrorResponse.self, from: data) {
+                throw AIScriptError.apiError(errorResponse.error.message)
+            }
+            throw AIScriptError.apiError("\(configuration.providerDisplayName) 请求失败（\(httpResponse.statusCode)）")
+        }
+
+        guard let decoded = try? JSONDecoder().decode(ChatCompletionsResponse.self, from: data),
+              let choice = decoded.choices.first,
+              let content = choice.message.content
+        else {
+            throw AIScriptError.invalidResponse
+        }
+        return content
+    }
+
     private var systemPrompt: String {
         """
         You are 录课台's breath-cut editor for teleprompter scripts.

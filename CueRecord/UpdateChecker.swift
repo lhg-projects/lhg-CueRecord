@@ -76,11 +76,11 @@ class UpdateChecker {
 
     private func showUpdateAvailable(latestVersion: String, releaseURL: String) {
         let alert = NSAlert()
-        alert.messageText = uiText("Update Available")
+        alert.messageText = uiText(InterfaceLanguageSettings.shared.text("Update Available"))
         alert.informativeText = InterfaceLanguageSettings.shared.format("录课台 %@ is available. You are currently running %@.", latestVersion, currentVersion)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: uiText("Download"))
-        alert.addButton(withTitle: uiText("Later"))
+        alert.addButton(withTitle: uiText(InterfaceLanguageSettings.shared.text("Download")))
+        alert.addButton(withTitle: uiText(InterfaceLanguageSettings.shared.text("Later")))
 
         if alert.runModal() == .alertFirstButtonReturn {
             if let url = URL(string: releaseURL) {
@@ -91,19 +91,19 @@ class UpdateChecker {
 
     private func showUpToDate() {
         let alert = NSAlert()
-        alert.messageText = uiText("You're Up to Date")
+        alert.messageText = uiText(InterfaceLanguageSettings.shared.text("You're Up to Date"))
         alert.informativeText = InterfaceLanguageSettings.shared.format("录课台 %@ is the latest version.", currentVersion)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: uiText("OK"))
+        alert.addButton(withTitle: uiText(InterfaceLanguageSettings.shared.text("OK")))
         alert.runModal()
     }
 
     private func showError(_ message: String) {
         let alert = NSAlert()
-        alert.messageText = uiText("Update Check Failed")
+        alert.messageText = uiText(InterfaceLanguageSettings.shared.text("Update Check Failed"))
         alert.informativeText = message
         alert.alertStyle = .warning
-        alert.addButton(withTitle: uiText("OK"))
+        alert.addButton(withTitle: uiText(InterfaceLanguageSettings.shared.text("OK")))
         alert.runModal()
     }
 }

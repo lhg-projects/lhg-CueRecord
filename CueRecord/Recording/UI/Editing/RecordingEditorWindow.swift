@@ -62,7 +62,7 @@ final class RecordingEditorWindow: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = uiText("Edit Recording")
+        window.title = uiText(InterfaceLanguageSettings.shared.text("Edit Recording"))
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
         window.minSize = NSSize(width: 980, height: 620)

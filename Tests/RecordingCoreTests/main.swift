@@ -543,6 +543,53 @@ func testRecordingEditorPresentation() throws {
     )
 }
 
+
+func testAIVoiceCommandParsing() throws {
+    // 规则层：中文口令
+    try expect(AIVoiceAssistant.ruleDecision(for: "下一页", pageCount: 5)?.action == .nextPage,
+               "「下一页」应识别为翻页")
+    try expect(AIVoiceAssistant.ruleDecision(for: "翻页吧", pageCount: 5)?.action == .nextPage,
+               "「翻页吧」应识别为翻页")
+    try expect(AIVoiceAssistant.ruleDecision(for: "上一页", pageCount: 5)?.action == .previousPage,
+               "「上一页」应识别为回退一页")
+    try expect(AIVoiceAssistant.ruleDecision(for: "暂停一下", pageCount: 5)?.action == .pauseScroll,
+               "「暂停一下」应识别为暂停")
+    try expect(AIVoiceAssistant.ruleDecision(for: "继续", pageCount: 5)?.action == .resumeScroll,
+               "「继续」应识别为继续")
+    try expect(AIVoiceDecision(action: .finishRecording, confidence: 0.9, origin: .rule, utterance: "结束录制")
+               == AIVoiceAssistant.ruleDecision(for: "结束录制", pageCount: 5),
+               "「结束录制」应识别为结束")
+
+    // 页码口令
+    try expect(AIVoiceAssistant.ruleDecision(for: "第 3 页", pageCount: 5)?.action == .jumpPage(2),
+               "「第 3 页」应跳到第 2 个索引")
+    try expect(AIVoiceAssistant.ruleDecision(for: "跳到第9页", pageCount: 5)?.action == .jumpPage(4),
+               "超出总页数时应收敛到最后一页")
+    try expect(AIVoiceAssistant.ruleDecision(for: "第一页", pageCount: 5)?.action == .jumpPage(0),
+               "「第一页」应跳到开头")
+
+    // 普通讲稿句子不该被当成口令
+    try expect(AIVoiceAssistant.ruleDecision(for: "今天我们讲一下工作流的基本结构", pageCount: 5) == nil,
+               "正文不得被识别成口令")
+    try expect(AIVoiceAssistant.isCommandCandidate("今天我们讲一下工作流的基本结构") == false,
+               "长句不是口令候选")
+    try expect(AIVoiceAssistant.isCommandCandidate("下一页") == true,
+               "短句是口令候选")
+
+    // 模型层 JSON 解析
+    let raw = "```json\n{\"action\":\"jump_page\",\"page\":4,\"confidence\":0.82}\n```"
+    try expect(AIVoiceAssistant.parse(raw, utterance: "去第四页", pageCount: 6)?.action == .jumpPage(3),
+               "模型返回的 jump_page 应转成索引")
+    try expect(AIVoiceAssistant.parse("{\"action\":\"next_page\",\"confidence\":0.7}",
+                                      utterance: "下一张", pageCount: 6)?.action == .nextPage,
+               "模型返回 next_page 应生效")
+    try expect(AIVoiceAssistant.parse("完全不是 JSON", utterance: "嗯", pageCount: 6) == nil,
+               "非 JSON 响应应返回空")
+    try expect(AIVoiceAssistant.parse("{\"action\":\"next_page\",\"confidence\":0.1}",
+                                      utterance: "嗯", pageCount: 6) == nil,
+               "低置信度应丢弃")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -562,7 +609,8 @@ let tests: [(String, () throws -> Void)] = [
     ("TeleprompterLegacySlowCueTokenization", testTeleprompterLegacySlowCueTokenization),
     ("SpeechTrackingThreeWordAnchorCrossesLineBreaks", testSpeechTrackingThreeWordAnchorCrossesLineBreaks),
     ("SpeechTrackingThreeCJKAnchorCrossesBreakTokens", testSpeechTrackingThreeCJKAnchorCrossesBreakTokens),
-    ("RecordingEditorPresentation", testRecordingEditorPresentation)
+    ("RecordingEditorPresentation", testRecordingEditorPresentation),
+    ("AIVoiceCommandParsing", testAIVoiceCommandParsing)
 ]
 
 do {

@@ -316,6 +316,8 @@ struct SettingsView: View {
     @State private var previewController = NotchPreviewController()
     @State private var selectedTab: SettingsTab
     @State private var showResetConfirmation = false
+    @State private var voiceCommandsEnabled = AIVoiceAssistant.shared.isCommandRecognitionEnabled
+    @State private var voiceModelAssist = AIVoiceAssistant.shared.isModelAssistEnabled
 
     init(settings: NotchSettings, initialTab: SettingsTab = .appearance) {
         self.settings = settings
@@ -692,6 +694,62 @@ struct SettingsView: View {
 
     // MARK: - Guidance Tab
 
+    private var aiVoiceSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(t("Voice AI"))
+                .font(.system(size: 13, weight: .medium))
+
+            Toggle(isOn: Binding(
+                get: { voiceCommandsEnabled },
+                set: { newValue in
+                    voiceCommandsEnabled = newValue
+                    AIVoiceAssistant.shared.isCommandRecognitionEnabled = newValue
+                }
+            )) {
+                Text(t("Voice commands"))
+                    .font(.system(size: 12))
+            }
+            .toggleStyle(.switch)
+
+            Text(t("Say “next page”, “pause” or “finish recording” to control the teleprompter."))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Toggle(isOn: Binding(
+                get: { voiceModelAssist },
+                set: { newValue in
+                    voiceModelAssist = newValue
+                    AIVoiceAssistant.shared.isModelAssistEnabled = newValue
+                }
+            )) {
+                Text(t("Let the AI model interpret unclear commands"))
+                    .font(.system(size: 12))
+            }
+            .toggleStyle(.switch)
+            .disabled(!voiceCommandsEnabled)
+
+            if voiceCommandsEnabled {
+                HStack(spacing: 6) {
+                    Image(systemName: AIVoiceAssistant.shared.hasModelAPIKey ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(AIVoiceAssistant.shared.hasModelAPIKey ? .green : .orange)
+                    Text(aiVoiceProviderSummary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var aiVoiceProviderSummary: String {
+        guard let configuration = AIVoiceAssistant.shared.modelConfiguration() else {
+            return t("No AI provider configured")
+        }
+        let keyState = AIVoiceAssistant.shared.hasModelAPIKey ? t("API Key saved") : t("API Key missing")
+        return "\(configuration.providerDisplayName) · \(configuration.modelDisplayName) · \(keyState)"
+    }
+
     private var guidanceTab: some View {
         VStack(alignment: .leading, spacing: 14) {
             Picker("", selection: $settings.listeningMode) {
@@ -717,6 +775,9 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Divider()
+            aiVoiceSection
 
             if settings.listeningMode != .classic {
                 Divider()

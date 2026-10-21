@@ -715,7 +715,7 @@ private struct StopWindowDragHandle: View {
                 }
             }
             .contentShape(Rectangle())
-            .help(uiText("Drag"))
+            .help(uiText(InterfaceLanguageSettings.shared.text("Drag")))
     }
 }
 

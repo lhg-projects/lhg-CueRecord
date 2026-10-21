@@ -193,7 +193,7 @@ class AreaSelectionView: NSView {
     }
     
     private func setupView() {
-        let ratioHint = aspectRatioPreset.aspectRatio == nil ? uiText("Free") : aspectRatioPreset.title
+        let ratioHint = aspectRatioPreset.aspectRatio == nil ? uiText(InterfaceLanguageSettings.shared.text("Free")) : aspectRatioPreset.title
         let instruction = InterfaceLanguageSettings.shared.format(
             "Drag to select recording area · %@ · Release to use · Press ESC to cancel",
             ratioHint

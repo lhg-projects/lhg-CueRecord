@@ -30,7 +30,7 @@ final class InterfaceLanguageSettings: ObservableObject {
 
     private init() {
         let savedLanguage = UserDefaults.standard.string(forKey: storageKey)
-        language = InterfaceLanguage(rawValue: savedLanguage ?? "") ?? .english
+        language = InterfaceLanguage(rawValue: savedLanguage ?? "") ?? .simplifiedChinese
     }
 
     func toggle() {
@@ -47,6 +47,13 @@ final class InterfaceLanguageSettings: ObservableObject {
     }
 
     private static let zhHans: [String: String] = [
+        "Voice AI": "语音 AI",
+        "Voice commands": "语音口令",
+        "Say “next page”, “pause” or “finish recording” to control the teleprompter.": "说「下一页」「暂停」「结束录制」直接控制提词器滚动。",
+        "Let the AI model interpret unclear commands": "认不出的口令交给第三方模型解析",
+        "No AI provider configured": "未配置 AI 接口",
+        "API Key saved": "API Key 已保存",
+        "API Key missing": "API Key 未填写",
         "AI Breath Cuts": "AI 断句",
         "Processing": "处理中",
         "Completed": "已完成",

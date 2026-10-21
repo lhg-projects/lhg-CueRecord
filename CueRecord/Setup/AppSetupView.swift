@@ -20,9 +20,9 @@ private enum AppSetupStep: Int, CaseIterable {
     var title: String {
         switch self {
         case .permissions:
-            return uiText("Permissions")
+            return uiText(InterfaceLanguageSettings.shared.text("Permissions"))
         case .workspace:
-            return uiText("Workspace")
+            return uiText(InterfaceLanguageSettings.shared.text("Workspace"))
         }
     }
 }
@@ -35,11 +35,11 @@ private enum SetupPermissionPage: Int, CaseIterable {
     var title: String {
         switch self {
         case .microphone:
-            return uiText("Microphone")
+            return uiText(InterfaceLanguageSettings.shared.text("Microphone"))
         case .camera:
-            return uiText("Camera")
+            return uiText(InterfaceLanguageSettings.shared.text("Camera"))
         case .screen:
-            return uiText("Screen")
+            return uiText(InterfaceLanguageSettings.shared.text("Screen"))
         }
     }
 
@@ -426,7 +426,7 @@ private struct DirectorySetupRow: View {
                 .frame(width: 30, height: 30)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(selectedDirectory?.lastPathComponent ?? uiText("Workspace"))
+                Text(selectedDirectory?.lastPathComponent ?? uiText(InterfaceLanguageSettings.shared.text("Workspace")))
                     .font(.callout)
                     .fontWeight(.semibold)
                     .lineLimit(1)
@@ -440,7 +440,7 @@ private struct DirectorySetupRow: View {
 
             Spacer(minLength: 12)
 
-            Button(uiText("Choose")) {
+            Button(uiText(InterfaceLanguageSettings.shared.text("Choose"))) {
                 onSelect()
             }
             .frame(width: 82)

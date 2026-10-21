@@ -16,11 +16,11 @@ private enum AIScriptGenerationStatus {
     var title: String {
         switch self {
         case .idle:
-            return uiText("AI Breath Cuts")
+            return uiText(InterfaceLanguageSettings.shared.text("AI Breath Cuts"))
         case .processing:
-            return uiText("Processing")
+            return uiText(InterfaceLanguageSettings.shared.text("Processing"))
         case .completed:
-            return uiText("Completed")
+            return uiText(InterfaceLanguageSettings.shared.text("Completed"))
         }
     }
 

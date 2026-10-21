@@ -546,7 +546,7 @@ struct CameraOverlayView: View {
             Image(systemName: "camera.fill")
                 .font(.largeTitle)
                 .foregroundColor(.gray)
-            Text(uiText("Camera"))
+            Text(uiText(InterfaceLanguageSettings.shared.text("Camera")))
                 .foregroundColor(.gray)
                 .font(.caption)
         }
@@ -607,23 +607,23 @@ struct CameraOverlayView: View {
 private extension View {
     func cameraContextMenu(windowController: CircularCameraWindow?) -> some View {
         self.contextMenu {
-            Button(uiText("Small")) {
+            Button(uiText(InterfaceLanguageSettings.shared.text("Small"))) {
                 windowController?.resizeWindow(to: .small)
             }
-            Button(uiText("Medium")) {
+            Button(uiText(InterfaceLanguageSettings.shared.text("Medium"))) {
                 windowController?.resizeWindow(to: .medium)
             }
-            Button(uiText("Large")) {
+            Button(uiText(InterfaceLanguageSettings.shared.text("Large"))) {
                 windowController?.resizeWindow(to: .large)
             }
             Divider()
-            Button(uiText("Circle")) {
+            Button(uiText(InterfaceLanguageSettings.shared.text("Circle"))) {
                 windowController?.updateShape(to: .circle)
             }
-            Button(uiText("Rounded Rectangle")) {
+            Button(uiText(InterfaceLanguageSettings.shared.text("Rounded Rectangle"))) {
                 windowController?.updateShape(to: .roundedSquare)
             }
-            Button(uiText("Rounded Square")) {
+            Button(uiText(InterfaceLanguageSettings.shared.text("Rounded Square"))) {
                 windowController?.updateShape(to: .roundedBox)
             }
         }

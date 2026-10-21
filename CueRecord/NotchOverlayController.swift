@@ -834,6 +834,41 @@ struct NotchOverlayView: View {
                 }
             }
         }
+        .onChange(of: speechRecognizer.lastSpokenText) { _, spoken in
+            guard AIVoiceAssistant.shared.isCommandRecognitionEnabled,
+                  AIVoiceAssistant.isCommandCandidate(spoken) else { return }
+            let snapshot = spoken
+            Task { @MainActor in
+                // 等这句话说完再判断，避免把半句当成口令
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                guard speechRecognizer.lastSpokenText == snapshot else { return }
+                let decision = await AIVoiceAssistant.shared.interpret(
+                    snapshot,
+                    pageCount: content.pageCount,
+                    currentPage: content.currentPageIndex
+                )
+                switch decision.action {
+                case .nextPage:
+                    speechRecognizer.shouldAdvancePage = true
+                case .previousPage:
+                    content.jumpToPageIndex = max(content.currentPageIndex - 1, 0)
+                case .firstPage:
+                    content.jumpToPageIndex = 0
+                case .lastPage:
+                    content.jumpToPageIndex = max(content.pageCount - 1, 0)
+                case .jumpPage(let index):
+                    content.jumpToPageIndex = min(max(index, 0), max(content.pageCount - 1, 0))
+                case .pauseScroll:
+                    isPaused = true
+                case .resumeScroll:
+                    isPaused = false
+                case .finishRecording:
+                    speechRecognizer.shouldDismiss = true
+                case .none:
+                    break
+                }
+            }
+        }
         .onChange(of: speechRecognizer.shouldDismiss) { _, shouldDismiss in
             if shouldDismiss {
                 // Reverse: hide content first, then shrink container
@@ -1097,7 +1132,7 @@ struct NotchOverlayView: View {
     private var pagePickerView: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(uiText("Jump to page"))
+                Text(uiText(InterfaceLanguageSettings.shared.text("Jump to page")))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
                     .padding(.bottom, 2)
@@ -1132,7 +1167,7 @@ struct NotchOverlayView: View {
                     }
                 }
 
-                Text(uiText("Tap a page to jump"))
+                Text(uiText(InterfaceLanguageSettings.shared.text("Tap a page to jump")))
                     .font(.system(size: 10))
                     .foregroundStyle(.white.opacity(0.3))
                     .padding(.top, 4)
@@ -1181,7 +1216,7 @@ struct NotchOverlayView: View {
                         speechRecognizer.shouldAdvancePage = true
                     } label: {
                         VStack(spacing: 4) {
-                            Text(uiText("Next Page"))
+                            Text(uiText(InterfaceLanguageSettings.shared.text("Next Page")))
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.5))
                             Image(systemName: "forward.fill")
@@ -1195,7 +1230,7 @@ struct NotchOverlayView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text(uiText("Done!"))
+                    Text(uiText(InterfaceLanguageSettings.shared.text("Done!")))
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                 }
@@ -1554,7 +1589,7 @@ struct FloatingOverlayView: View {
     private var floatingPagePickerView: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(uiText("Jump to page"))
+                Text(uiText(InterfaceLanguageSettings.shared.text("Jump to page")))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
                     .padding(.bottom, 4)
@@ -1589,7 +1624,7 @@ struct FloatingOverlayView: View {
                     }
                 }
 
-                Text(uiText("Tap a page to jump"))
+                Text(uiText(InterfaceLanguageSettings.shared.text("Tap a page to jump")))
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.3))
                     .padding(.top, 4)
@@ -1613,7 +1648,7 @@ struct FloatingOverlayView: View {
                             .animation(.easeInOut(duration: 0.3), value: countdownRemaining)
                     }
                     if followingCursor {
-                        Text(uiText("Next Page"))
+                        Text(uiText(InterfaceLanguageSettings.shared.text("Next Page")))
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.white)
                     } else {
@@ -1624,7 +1659,7 @@ struct FloatingOverlayView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "play.fill")
                                     .font(.system(size: 14, weight: .bold))
-                                Text(uiText("Next Page"))
+                                Text(uiText(InterfaceLanguageSettings.shared.text("Next Page")))
                                     .font(.system(size: 14, weight: .bold))
                             }
                             .foregroundStyle(.white)
@@ -1640,7 +1675,7 @@ struct FloatingOverlayView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text(uiText("Done!"))
+                    Text(uiText(InterfaceLanguageSettings.shared.text("Done!")))
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                 }

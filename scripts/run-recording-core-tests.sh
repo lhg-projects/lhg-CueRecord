@@ -20,6 +20,10 @@ xcrun swiftc \
   "$ROOT/CueRecord/Recording/Core/Recording/RecordingArtifactOrganizer.swift" \
   "$ROOT/CueRecord/Recording/Core/Recording/RecordingOutputValidator.swift" \
   "$ROOT/CueRecord/Recording/Core/Recording/RecordingEditorPresentation.swift" \
+  "$ROOT/CueRecord/AI/AIModelCatalog.swift" \
+  "$ROOT/CueRecord/AI/AIModelCatalogModelsDev.swift" \
+  "$ROOT/CueRecord/AI/ScriptAI.swift" \
+  "$ROOT/CueRecord/AI/AIVoiceAssistant.swift" \
   "$ROOT/Tests/RecordingCoreTests/main.swift" \
   -o "$OUTPUT"
 

@@ -308,7 +308,7 @@ struct ExternalDisplayView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 28, weight: .bold))
-                        Text(uiText("Next Page"))
+                        Text(uiText(InterfaceLanguageSettings.shared.text("Next Page")))
                             .font(.system(size: 28, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -322,7 +322,7 @@ struct ExternalDisplayView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 60))
                     .foregroundStyle(.green)
-                Text(uiText("Done!"))
+                Text(uiText(InterfaceLanguageSettings.shared.text("Done!")))
                     .font(.system(size: 32, weight: .bold))
                     .foregroundStyle(.white)
             }
