@@ -36,7 +36,7 @@ enum AIBreathMarkerMode: String, CaseIterable, Identifiable {
             - Use a line-leading "›› " before short bridge lines or low-importance lines that should be read faster.
             - Use "-- " immediately before important concepts, dense professional terms, or key claims that should be read slower.
             - Use real newline characters for paragraph boundaries, markdown headings, and list items.
-            - CueRecord treats "|" and "｜" as forced teleprompter line breaks; prefer the full-width "｜" form in AI output.
+            - 录课台 treats "|" and "｜" as forced teleprompter line breaks; prefer the full-width "｜" form in AI output.
             - Do not overuse "››" or "--"; only mark real pacing changes.
             """
         case .clean:
@@ -242,7 +242,7 @@ struct AIChatCompletionsClient {
 
     private var systemPrompt: String {
         """
-        You are CueRecord's breath-cut editor for teleprompter scripts.
+        You are 录课台's breath-cut editor for teleprompter scripts.
         Return only the updated markdown draft. Do not wrap the answer in code fences. Do not mention that you are an AI.
         Preserve the original factual meaning, order, headings, and list structure as much as possible.
         Your job is to add speaker-friendly breath cuts, rhythm cues, and pacing spaces, not to rewrite or expand the script.

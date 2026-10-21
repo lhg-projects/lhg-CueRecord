@@ -6,10 +6,10 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$PROJECT_DIR/build/release"
 ARCHIVE_ARM="$BUILD_DIR/CueRecord-arm64.xcarchive"
 ARCHIVE_X86="$BUILD_DIR/CueRecord-x86_64.xcarchive"
-APP_NAME="CueRecord.app"
+APP_NAME="LLSStudio.app"
 OUTPUT_DIR="$BUILD_DIR/universal"
 OUTPUT_APP="$OUTPUT_DIR/$APP_NAME"
-DMG_NAME="CueRecord.dmg"
+DMG_NAME="LLSStudio.dmg"
 DMG_PATH="$BUILD_DIR/$DMG_NAME"
 TEAM_ID="${TEAM_ID:-}"
 SIGN_IDENTITY="${SIGN_IDENTITY:-}"
@@ -115,7 +115,7 @@ cp -R "$OUTPUT_APP" "$DMG_STAGING/"
 ln -s /Applications "$DMG_STAGING/Applications"
 
 hdiutil create \
-  -volname "CueRecord" \
+  -volname "LLSStudio" \
   -srcfolder "$DMG_STAGING" \
   -ov \
   -format UDZO \
@@ -144,4 +144,4 @@ echo "✅ Done!"
 echo "   App:  $OUTPUT_APP"
 echo "   DMG:  $DMG_PATH"
 echo ""
-lipo -info "$OUTPUT_APP/Contents/MacOS/CueRecord"
+lipo -info "$OUTPUT_APP/Contents/MacOS/LLSStudio"

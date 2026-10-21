@@ -1,5 +1,5 @@
-lhg-CueRecord
-Copyright 2026 lhg-projects
+刘老师 · 录课台 (LLSStudio)
+Copyright 2026 刘老师 / lls-projects
 
 This product is a modified derivative of CueRecord
 (https://github.com/nolangz/CueRecord), Copyright Nolan Lai,
@@ -8,6 +8,6 @@ licensed under the Apache License, Version 2.0. See LICENSE.
 The teleprompter portion originates from f/textream
 (https://github.com/f/textream), as credited by the upstream project.
 
-Changes made in this repository (lhg-projects/lhg-CueRecord), relative to
+Changes made in this repository (lls-projects/lls-studio), relative to
 upstream CueRecord v2.0.4, are recorded in README.md under
 "本仓库改动记录". Modified source files carry a header note or are listed there.

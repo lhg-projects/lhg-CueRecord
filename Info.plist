@@ -5,18 +5,18 @@
 	<key>ATSApplicationFontsPath</key>
 	<string>.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>CueRecord needs to capture system audio when recording your screen.</string>
+	<string>录课台需要捕获系统声音，才能把电脑里播放的声音一起录进课程。</string>
 	<key>NSCameraUsageDescription</key>
-	<string>CueRecord needs camera access for the recording camera overlay.</string>
+	<string>录课台需要访问摄像头，才能在画面里显示你的出镜小窗。</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>CueRecord needs microphone access to include your voice in recordings and speech guidance.</string>
+	<string>录课台需要使用麦克风，才能录进你的讲解声音并驱动语音引导提词。</string>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>CueRecord needs screen recording access to capture your screen while recording.</string>
+	<string>录课台需要屏幕录制权限，才能录下你选择的画面。</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>CueRecord Document</string>
+			<string>录课台文稿</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
@@ -37,7 +37,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>CueRecord Document</string>
+			<string>录课台文稿</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.nolanlai.cuerecord.document</string>
 			<key>UTTypeTagSpecification</key>
@@ -68,12 +68,12 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>Read in CueRecord</string>
+				<string>用录课台打开</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>readInCueRecord</string>
 			<key>NSPortName</key>
-			<string>CueRecord</string>
+			<string>录课台</string>
 			<key>NSSendTypes</key>
 			<array>
 				<string>public.utf8-plain-text</string>
@@ -89,7 +89,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Legacy CueRecord Document</string>
+			<string>Legacy 录课台 Document</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.nolanlai.takeone.document</string>
 			<key>UTTypeTagSpecification</key>
@@ -107,7 +107,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Legacy CueRecord Document</string>
+			<string>Legacy 录课台 Document</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.nolanlai.cueshot.document</string>
 			<key>UTTypeTagSpecification</key>

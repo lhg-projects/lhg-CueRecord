@@ -1,13 +1,13 @@
-# lhg-CueRecord · macOS 录屏提词器
+# 刘老师 · 录课台 · macOS 录屏提词器
 
 > [!TIP]
-> **TL;DR**：macOS 原生录屏 App，一个软件全包高清录屏 + 摄像头画中画 + 麦克风 / 系统音频 + 内置提词器 + 4K 导出，专为录教程、录课、产品演示和口播视频打造。基于 [nolangz/CueRecord](https://github.com/nolangz/CueRecord) v2.0.4（Apache License 2.0）二次开发，后续在此基础上做 lhg 自己的功能。
+> **TL;DR**：macOS 原生录屏 App，一个软件全包高清录屏 + 摄像头画中画 + 麦克风 / 系统音频 + 内置提词器 + 4K 导出，专为录教程、录课、产品演示和口播视频打造。基于 [nolangz/CueRecord](https://github.com/nolangz/CueRecord) v2.0.4（Apache License 2.0）二次开发，后续在此基础上做「刘老师 · 录课台」自己的功能。
 
 [![Platform](https://img.shields.io/badge/Platform-macOS-111111)]()
 [![Swift](https://img.shields.io/badge/Swift-FA7343?logo=swift&logoColor=white)](https://www.swift.org/)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
-录一条像样的教程视频，通常要拼三件工具：录屏软件录画面、提词器 App 照着稿子念、摄像头小窗单独开——录完还要对轨、合成，来回折腾。**lhg-CueRecord 把这四件事装进一个原生 macOS App**：选好录制区域、打开提词器照着念，屏幕、摄像头、麦克风和系统声音一次录全，直接导出成片。
+录一条像样的教程视频，通常要拼三件工具：录屏软件录画面、提词器 App 照着稿子念、摄像头小窗单独开——录完还要对轨、合成，来回折腾。**录课台把这四件事装进一个原生 macOS App**：选好录制区域、打开提词器照着念，屏幕、摄像头、麦克风和系统声音一次录全，直接导出成片。
 
 **适合谁**：录网课 / 教程的知识创作者、做产品演示和 SaaS walkthrough 的开发者与创始人、录口播和演示稿的演讲者——所有「要对着稿子录屏」的人。
 
@@ -35,8 +35,8 @@
 
 ```bash
 git lfs install
-git clone https://github.com/lhg-projects/lhg-CueRecord.git
-cd lhg-CueRecord
+git clone https://github.com/lhg-projects/lls-studio.git
+cd lls-studio
 git lfs pull
 ```
 
@@ -70,7 +70,7 @@ scripts/build-local.sh               # 只构建
 
 两点注意：
 
-- 本仓库的 Bundle ID 是 `com.lhg.cuerecord`，与上游官方包（`com.nolanlai.cuerecord`）**是两个独立 App**：可以和上游版本共存，但权限授权、偏好设置、Vault 路径都是各自独立的一套，首次启动要重新选 Vault 并重新授权。
+- 本仓库的 Bundle ID 是 `com.liulaoshi.llsstudio`，与上游官方包 CueRecord（`com.nolanlai.cuerecord`）**是两个独立 App**：可以和上游版本共存，但权限授权、偏好设置、Vault 路径都是各自独立的一套，首次启动要重新选 Vault 并重新授权。
 - ad-hoc 签名每次重新编译后 CDHash 会变，macOS 会把屏幕录制等权限视为新 App，需要到「系统设置 → 隐私与安全性」里重新勾选。
 
 ### 预编译包
@@ -118,11 +118,19 @@ build.sh                  签名 + 公证的发布 DMG 构建脚本
 
 - 本项目 fork 自 [nolangz/CueRecord](https://github.com/nolangz/CueRecord) v2.0.4，依 **Apache License 2.0** 二次开发；许可证原文见 [LICENSE](LICENSE)，上游版权声明保留。
 - 其中**提词器部分源自 [f/textream](https://github.com/f/textream)**（上游 Credits 已注明，此处沿袭标注）。
-- 本次整改范围：README 与项目元信息已按 lhg-projects 自有项目规范重写，去掉上游作者的个人品牌内容。
+- 本次整改范围：README 与项目元信息已按自有项目规范重写，去掉上游作者的个人品牌内容。
 - 代码在上游 v2.0.4 基础上的改动见下方「本仓库改动记录」，逐条可回归。
 - 这是一个已发布的成熟项目，改动遵循上游 `AGENTS.md` 的约定：改动保持小而聚焦，每处改动测试受影响的区域后再算完成。
 
 ## 本仓库改动记录
+
+### v2.2.0（品牌化）
+
+- 产品改名 **刘老师 · 录课台**：`PRODUCT_NAME=LLSStudio`（产物 `LLSStudio.app`），显示名走 `CFBundleDisplayName`，Finder / Dock / 菜单栏 / 关于页统一。
+- 换新图标：石墨黑方底 + 白色课件卡（三行讲稿）+ 圆形出镜窗（人像）+ 录制红点；切图覆盖 16–1024 全尺寸，叙事见 [BRAND.md](BRAND.md)。
+- Bundle ID 改为 `com.liulaoshi.llsstudio`，与上游包共存；首次启动需重新选 Vault、重新授权。
+- 系统权限弹窗文案、文档类型名、更新检查与帮助链接改为自有身份。
+- 内部标识保持不变：`.cuerecord` 元数据目录、`cuerecord://` scheme、Keychain service（`com.nolanlai.*`）、UTI `com.nolanlai.cuerecord.document`——目的是让已有 Vault 和已存 API key 继续可用。
 
 ### v2.1.0
 

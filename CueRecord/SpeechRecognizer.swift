@@ -196,7 +196,7 @@ class SpeechRecognizer {
         // Check microphone permission first
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .denied, .restricted:
-            error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow CueRecord."
+            error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow 录课台."
             openMicrophoneSettings()
             return
         case .notDetermined:
@@ -205,7 +205,7 @@ class SpeechRecognizer {
                     if granted {
                         self?.beginRecognition()
                     } else {
-                        self?.error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow CueRecord."
+                        self?.error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow 录课台."
                     }
                 }
             }

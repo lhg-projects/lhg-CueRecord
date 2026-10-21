@@ -10,7 +10,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DD="$ROOT/build/DerivedData"
-PRODUCT="$DD/Build/Products/Release/CueRecord.app"
+PRODUCT=""   # resolved after the build from Build/Products/Release/*.app
 INSTALL_DIR="$HOME/Applications"
 INSTALL=0
 
@@ -82,25 +82,29 @@ xcodebuild \
   CODE_SIGNING_REQUIRED=NO \
   build
 
-if [ ! -d "$PRODUCT" ]; then
-  echo "error: build finished but $PRODUCT is missing" >&2
+PRODUCT="$(ls -d "$DD"/Build/Products/Release/*.app 2>/dev/null | head -1)"
+if [ -z "$PRODUCT" ] || [ ! -d "$PRODUCT" ]; then
+  echo "error: build finished but no .app found in $DD/Build/Products/Release" >&2
   exit 1
 fi
+APP_BASENAME="$(basename "$PRODUCT")"
 
 echo "✅ Built: $PRODUCT"
 codesign -dv "$PRODUCT" 2>&1 | sed -n '1,3p'
 
 if [ "$INSTALL" -eq 1 ]; then
   mkdir -p "$INSTALL_DIR"
-  echo "📦 Installing to $INSTALL_DIR/CueRecord.app"
-  rm -rf "$INSTALL_DIR/CueRecord.app"
-  ditto "$PRODUCT" "$INSTALL_DIR/CueRecord.app"
-  echo "✅ Installed. Bundle ID: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INSTALL_DIR/CueRecord.app/Contents/Info.plist")"
+  TARGET="$INSTALL_DIR/$APP_BASENAME"
+  echo "📦 Installing to $TARGET"
+  rm -rf "$TARGET"
+  ditto "$PRODUCT" "$TARGET"
+  echo "✅ Installed. Bundle ID: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$TARGET/Contents/Info.plist")"
+  echo "   Display name:  $(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$TARGET/Contents/Info.plist")"
   cat <<'MSG'
 
 Next:
-  open ~/Applications/CueRecord.app
-  - This build uses com.lhg.cuerecord, so it is a separate app from the
+  open ~/Applications/LLSStudio.app
+  - This build uses its own bundle id, so it is a separate app from the
     /Applications/CueRecord.app you installed from upstream. Both can coexist.
   - First launch: pick your vault folder again, then re-grant Screen Recording,
     Microphone, Camera and System Audio.

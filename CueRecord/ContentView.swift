@@ -569,7 +569,7 @@ struct ContentView: View {
             Spacer()
 
             VStack(spacing: 8) {
-                Text(t("Choose a CueRecord Workspace"))
+                Text(t("Choose a 录课台 Workspace"))
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(.primary)
 
@@ -1613,7 +1613,7 @@ struct AboutView: View {
 
             // App name & version
             VStack(spacing: 4) {
-                Text("CueRecord")
+                Text("录课台")
                     .font(.system(size: 20, weight: .bold))
                 Text("\(t("Version")) \(appVersion)")
                     .font(.system(size: 12))
@@ -1633,7 +1633,7 @@ struct AboutView: View {
                 Text(t("Based on nolangz/CueRecord · Apache-2.0"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
-                Text("CueRecord")
+                Text("录课台")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }

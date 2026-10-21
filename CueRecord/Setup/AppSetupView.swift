@@ -114,7 +114,7 @@ struct AppSetupView: View {
                 CueRecordLogoView(cornerRadius: 8)
                     .frame(width: 34, height: 34)
 
-                Text(t("Set Up CueRecord"))
+                Text(t("Set Up 录课台"))
                     .font(.title3)
                     .fontWeight(.semibold)
 
@@ -296,7 +296,7 @@ struct AppSetupView: View {
 
     private func selectVault() {
         let panel = NSOpenPanel()
-        panel.title = t("Choose CueRecord Workspace")
+        panel.title = t("Choose 录课台 Workspace")
         panel.prompt = t("Choose")
         panel.canChooseFiles = false
         panel.canChooseDirectories = true

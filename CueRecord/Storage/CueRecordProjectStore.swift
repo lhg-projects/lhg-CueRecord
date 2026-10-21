@@ -54,12 +54,12 @@ enum CueRecordFileConflictError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .changedOnDisk(let url):
-            return "\(url.lastPathComponent) changed on disk before CueRecord could save it."
+            return "\(url.lastPathComponent) changed on disk before 录课台 could save it."
         }
     }
 
     var recoverySuggestion: String? {
-        "CueRecord reloaded the project from disk to avoid overwriting external changes."
+        "录课台 reloaded the project from disk to avoid overwriting external changes."
     }
 }
 

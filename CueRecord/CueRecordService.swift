@@ -552,7 +552,7 @@ class CueRecordService: NSObject, ObservableObject {
 
     func chooseVaultFolder() {
         let panel = NSOpenPanel()
-        panel.message = "Choose CueRecord Workspace"
+        panel.message = "Choose 录课台 Workspace"
         panel.prompt = "Choose"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -615,7 +615,7 @@ class CueRecordService: NSObject, ObservableObject {
             loadProject(at: currentProjectIndex)
         } catch {
             let alert = NSAlert()
-            alert.messageText = uiText("Failed to open CueRecord workspace")
+            alert.messageText = uiText("Failed to open 录课台 workspace")
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
@@ -959,7 +959,7 @@ class CueRecordService: NSObject, ObservableObject {
                 }
             }
         } catch {
-            handleFileMutationError(error, title: "Failed to update CueRecord project")
+            handleFileMutationError(error, title: "Failed to update 录课台 project")
         }
         refreshCurrentProjectMetadata()
         syncCurrentProjectManifest()

@@ -505,7 +505,7 @@ class ScreenRecorder: NSObject, ObservableObject {
         } else {
             let excludedWindows = ownShareableWindows(in: availableContent)
             if !excludedWindows.isEmpty {
-                print("🪟 Excluding \(excludedWindows.count) CueRecord windows from capture")
+                print("🪟 Excluding \(excludedWindows.count) 录课台 windows from capture")
             }
             filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
         }

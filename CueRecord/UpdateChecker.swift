@@ -9,8 +9,8 @@ import AppKit
 class UpdateChecker {
     static let shared = UpdateChecker()
 
-    private let repoOwner = "lhg-projects"
-    private let repoName = "lhg-CueRecord"
+    private let repoOwner = "lls-projects"
+    private let repoName = "lhg-录课台"
 
     private var currentVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
@@ -77,7 +77,7 @@ class UpdateChecker {
     private func showUpdateAvailable(latestVersion: String, releaseURL: String) {
         let alert = NSAlert()
         alert.messageText = uiText("Update Available")
-        alert.informativeText = InterfaceLanguageSettings.shared.format("CueRecord %@ is available. You are currently running %@.", latestVersion, currentVersion)
+        alert.informativeText = InterfaceLanguageSettings.shared.format("录课台 %@ is available. You are currently running %@.", latestVersion, currentVersion)
         alert.alertStyle = .informational
         alert.addButton(withTitle: uiText("Download"))
         alert.addButton(withTitle: uiText("Later"))
@@ -92,7 +92,7 @@ class UpdateChecker {
     private func showUpToDate() {
         let alert = NSAlert()
         alert.messageText = uiText("You're Up to Date")
-        alert.informativeText = InterfaceLanguageSettings.shared.format("CueRecord %@ is the latest version.", currentVersion)
+        alert.informativeText = InterfaceLanguageSettings.shared.format("录课台 %@ is the latest version.", currentVersion)
         alert.alertStyle = .informational
         alert.addButton(withTitle: uiText("OK"))
         alert.runModal()

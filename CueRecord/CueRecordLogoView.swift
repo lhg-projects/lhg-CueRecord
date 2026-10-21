@@ -4,7 +4,7 @@ struct CueRecordLogoView: View {
     var cornerRadius: CGFloat = 8
 
     var body: some View {
-        Image("CueRecordLogo")
+        Image("录课台Logo")
             .resizable()
             .interpolation(.high)
             .antialiased(true)

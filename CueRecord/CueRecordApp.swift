@@ -133,7 +133,7 @@ struct CueRecordApp: App {
 
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button(interfaceLanguage.text("About CueRecord")) {
+                Button(interfaceLanguage.text("About 录课台")) {
                     NotificationCenter.default.post(name: .openAbout, object: nil)
                 }
                 Divider()
@@ -156,8 +156,8 @@ struct CueRecordApp: App {
             CommandGroup(replacing: .saveItem) { }
             CommandGroup(replacing: .windowArrangement) { }
             CommandGroup(replacing: .help) {
-                Button(interfaceLanguage.text("CueRecord Help")) {
-                    if let url = URL(string: "https://github.com/lhg-projects/lhg-CueRecord") {
+                Button(interfaceLanguage.text("录课台 Help")) {
+                    if let url = URL(string: "https://github.com/lls-projects/lls-studio") {
                         NSWorkspace.shared.open(url)
                     }
                 }
