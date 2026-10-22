@@ -1440,6 +1440,7 @@ class ScreenRecorder: NSObject, ObservableObject {
         var nextCameraSample = cameraOutput.copyNextSampleBuffer()
         var maskCache: [String: CIImage] = [:]
         let bufferExtent = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
+        _ = bufferExtent
         // 合成阶段始终按「未裁切」的完整画面布局，气泡坐标才不会整体偏移；
         // 裁切放在最后一步，只影响输出尺寸。
         let composeSize = exportSettings.cropTo16x9
@@ -1660,6 +1661,33 @@ class ScreenRecorder: NSObject, ObservableObject {
         let renderColorSpace = CGColorSpaceCreateDeviceRGB()
         var editedFrameCount = 0
 
+        // 恒定帧率输出：屏幕录制是变帧率（画面不变就不出帧），
+        // 直接写进 60fps 容器会在播放器里表现为顿挫。
+        // 这里把时间量化到 30fps 网格，空洞用上一帧补齐，输出真正的 CFR。
+        let outputTimescale: CMTimeScale = 30
+        var lastWrittenSlot: Int64 = -1
+        var lastFinalImage: CIImage?
+
+        func appendFrame(_ image: CIImage, atSlot slot: Int64) -> Bool {
+            guard let buffer = Self.createPixelBuffer(from: adapter) else { return false }
+            ciContext.render(image, to: buffer, bounds: bufferExtent, colorSpace: renderColorSpace)
+            while !writerInput.isReadyForMoreMediaData {
+                Thread.sleep(forTimeInterval: 0.002)
+            }
+            return adapter.append(buffer, withPresentationTime: CMTime(value: slot, timescale: outputTimescale))
+        }
+
+        /// 把 [from, to] 之间的空槽用上一帧填满
+        func fillGap(upTo slot: Int64, with image: CIImage?) {
+            guard let image else { return }
+            var next = lastWrittenSlot + 1
+            while next < slot {
+                _ = appendFrame(image, atSlot: next)
+                next += 1
+            }
+            lastWrittenSlot = max(lastWrittenSlot, slot - 1)
+        }
+
         while let screenSample = screenOutput.copyNextSampleBuffer() {
             let screenTime = CMSampleBufferGetPresentationTimeStamp(screenSample)
             let screenSeconds = CMTimeGetSeconds(screenTime)
@@ -1702,20 +1730,20 @@ class ScreenRecorder: NSObject, ObservableObject {
                 let finalImage = exportSettings.cropTo16x9
                     ? Self.cropToAspect(composedImage, from: outputExtent, to: bufferExtent)
                     : composedImage
-                ciContext.render(
-                    finalImage,
-                    to: outputPixelBuffer,
-                    bounds: bufferExtent,
-                    colorSpace: renderColorSpace
-                )
-
-                while !writerInput.isReadyForMoreMediaData {
-                    Thread.sleep(forTimeInterval: 0.002)
-                }
 
                 let outputSeconds = resolvedCut.outputStartSeconds + (screenSeconds - resolvedCut.startSeconds)
-                adapter.append(outputPixelBuffer, withPresentationTime: CMTime(seconds: outputSeconds, preferredTimescale: 600))
-                editedFrameCount += 1
+                let slot = Int64((outputSeconds * Double(outputTimescale)).rounded(.down))
+                if slot > lastWrittenSlot {
+                    fillGap(upTo: slot, with: lastFinalImage)
+                    ciContext.render(finalImage, to: outputPixelBuffer, bounds: bufferExtent, colorSpace: renderColorSpace)
+                    while !writerInput.isReadyForMoreMediaData {
+                        Thread.sleep(forTimeInterval: 0.002)
+                    }
+                    _ = adapter.append(outputPixelBuffer, withPresentationTime: CMTime(value: slot, timescale: outputTimescale))
+                    lastWrittenSlot = slot
+                    lastFinalImage = finalImage
+                    editedFrameCount += 1
+                }
                 if editedFrameCount % 300 == 0 {
                     MemoryFootprint.log("剪辑合成中（\(editedFrameCount) 帧）")
                 }
@@ -1723,6 +1751,12 @@ class ScreenRecorder: NSObject, ObservableObject {
             }
 
             if outcome == .stop { break }
+        }
+
+        // 补齐结尾：最后一个源帧到素材结束之间的空槽也要填满，否则尾部会缺帧
+        if let lastCut = resolvedCuts.last {
+            let endSlot = Int64(((lastCut.outputStartSeconds + (lastCut.endSeconds - lastCut.startSeconds)) * Double(outputTimescale)).rounded(.down))
+            fillGap(upTo: endSlot, with: lastFinalImage)
         }
 
         writerInput.markAsFinished()
