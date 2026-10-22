@@ -1439,7 +1439,13 @@ class ScreenRecorder: NSObject, ObservableObject {
         var currentCameraTime = CMTime.zero
         var nextCameraSample = cameraOutput.copyNextSampleBuffer()
         var maskCache: [String: CIImage] = [:]
-        let outputExtent = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
+        let bufferExtent = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
+        // 合成阶段始终按「未裁切」的完整画面布局，气泡坐标才不会整体偏移；
+        // 裁切放在最后一步，只影响输出尺寸。
+        let composeSize = exportSettings.cropTo16x9
+            ? exportSettings.resolutionPreset.outputSize(for: screenSize)
+            : CGSize(width: outputWidth, height: outputHeight)
+        let outputExtent = CGRect(origin: .zero, size: composeSize)
 
         func advanceCameraFrame(to screenTime: CMTime) {
             while let sample = nextCameraSample {
@@ -1487,10 +1493,13 @@ class ScreenRecorder: NSObject, ObservableObject {
                     maskCache: &maskCache
                 )
 
+                let finalImage = exportSettings.cropTo16x9
+                    ? Self.cropToAspect(composedImage, from: outputExtent, to: bufferExtent)
+                    : composedImage
                 ciContext.render(
-                    composedImage,
+                    finalImage,
                     to: outputPixelBuffer,
-                    bounds: outputExtent,
+                    bounds: bufferExtent,
                     colorSpace: renderColorSpace
                 )
 
@@ -1537,7 +1546,13 @@ class ScreenRecorder: NSObject, ObservableObject {
         let outputSize = exportSettings.outputSize(for: screenSize)
         let outputWidth = Int(outputSize.width)
         let outputHeight = Int(outputSize.height)
-        let outputExtent = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
+        let bufferExtent = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
+        // 合成阶段始终按「未裁切」的完整画面布局，气泡坐标才不会整体偏移；
+        // 裁切放在最后一步，只影响输出尺寸。
+        let composeSize = exportSettings.cropTo16x9
+            ? exportSettings.resolutionPreset.outputSize(for: screenSize)
+            : CGSize(width: outputWidth, height: outputHeight)
+        let outputExtent = CGRect(origin: .zero, size: composeSize)
 
         let screenReader = try AVAssetReader(asset: screenAsset)
         let readerSettings: [String: Any] = [
@@ -1684,10 +1699,13 @@ class ScreenRecorder: NSObject, ObservableObject {
                     maskCache: &maskCache
                 )
 
+                let finalImage = exportSettings.cropTo16x9
+                    ? Self.cropToAspect(composedImage, from: outputExtent, to: bufferExtent)
+                    : composedImage
                 ciContext.render(
-                    composedImage,
+                    finalImage,
                     to: outputPixelBuffer,
-                    bounds: outputExtent,
+                    bounds: bufferExtent,
                     colorSpace: renderColorSpace
                 )
 
@@ -1797,7 +1815,13 @@ class ScreenRecorder: NSObject, ObservableObject {
 
         let ciContext = CIContext()
         var maskCache: [String: CIImage] = [:]
-        let outputExtent = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
+        let bufferExtent = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
+        // 合成阶段始终按「未裁切」的完整画面布局，气泡坐标才不会整体偏移；
+        // 裁切放在最后一步，只影响输出尺寸。
+        let composeSize = exportSettings.cropTo16x9
+            ? exportSettings.resolutionPreset.outputSize(for: screenSize)
+            : CGSize(width: outputWidth, height: outputHeight)
+        let outputExtent = CGRect(origin: .zero, size: composeSize)
 
         while let cameraSample = cameraOutput.copyNextSampleBuffer() {
             guard let cameraPixelBuffer = CMSampleBufferGetImageBuffer(cameraSample),
@@ -2032,6 +2056,39 @@ class ScreenRecorder: NSObject, ObservableObject {
             .transformed(by: CGAffineTransform(translationX: translationX, y: translationY))
     }
 
+    /// 把合成好的整幅画面按目标比例居中裁切，再缩放到目标尺寸。
+    /// 用于「导出 16:9」：整屏录制是 1.53:1，直接上传会被平台加黑边。
+    private nonisolated static func cropToAspect(
+        _ image: CIImage,
+        from sourceExtent: CGRect,
+        to targetExtent: CGRect
+    ) -> CIImage {
+        guard sourceExtent.width > 0, sourceExtent.height > 0,
+              targetExtent.width > 0, targetExtent.height > 0 else { return image }
+
+        let targetAspect = targetExtent.width / targetExtent.height
+        let sourceAspect = sourceExtent.width / sourceExtent.height
+
+        let cropRect: CGRect
+        if abs(sourceAspect - targetAspect) < 0.0001 {
+            cropRect = sourceExtent
+        } else if sourceAspect > targetAspect {
+            let width = sourceExtent.height * targetAspect
+            cropRect = CGRect(x: sourceExtent.midX - width / 2, y: sourceExtent.minY,
+                              width: width, height: sourceExtent.height)
+        } else {
+            let height = sourceExtent.width / targetAspect
+            cropRect = CGRect(x: sourceExtent.minX, y: sourceExtent.midY - height / 2,
+                              width: sourceExtent.width, height: height)
+        }
+
+        return image
+            .cropped(to: cropRect)
+            .transformed(by: CGAffineTransform(translationX: -cropRect.minX, y: -cropRect.minY))
+            .transformed(by: CGAffineTransform(scaleX: targetExtent.width / cropRect.width,
+                                               y: targetExtent.height / cropRect.height))
+    }
+
     private nonisolated static func overlayTargetRect(
         from overlayFrame: CGRect,
         metadata: CameraOverlayMetadataFile,
@@ -2050,12 +2107,25 @@ class ScreenRecorder: NSObject, ObservableObject {
             height: overlayFrame.height * uniformScale
         )
 
-        return CGRect(
+        var rect = CGRect(
             x: center.x - size.width / 2,
             y: center.y - size.height / 2,
             width: size.width,
             height: size.height
         )
+
+        // 气泡原本按屏幕绝对坐标落位，会压住菜单栏（顶部约 24pt）。
+        // 这里把它钳制在安全区内：四边留出约 4% 的边距。
+        let inset = min(outputExtent.width, outputExtent.height) * 0.04
+        let safeRect = outputExtent.insetBy(dx: inset, dy: inset)
+        if safeRect.width >= rect.width, safeRect.height >= rect.height {
+            rect.origin.x = min(max(rect.minX, safeRect.minX), safeRect.maxX - rect.width)
+            rect.origin.y = min(max(rect.minY, safeRect.minY), safeRect.maxY - rect.height)
+        } else {
+            rect.origin.x = safeRect.midX - rect.width / 2
+            rect.origin.y = safeRect.midY - rect.height / 2
+        }
+        return rect
     }
 
     private nonisolated static func overlayMask(size: CGSize, shape: String, cache: inout [String: CIImage]) -> CIImage {

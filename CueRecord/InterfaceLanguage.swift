@@ -47,6 +47,7 @@ final class InterfaceLanguageSettings: ObservableObject {
     }
 
     private static let zhHans: [String: String] = [
+        "Crop to 16:9": "裁成 16:9",
         "Turned it on in System Settings? Restart the app for it to take effect.": "已经在系统设置里打开了？重启应用才生效。",
         "Restart App": "重启应用",
         "Background": "背景",

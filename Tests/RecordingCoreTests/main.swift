@@ -624,6 +624,22 @@ func testLocalizationDictionaryHasNoDuplicateKeys() throws {
     try expect(duplicates.isEmpty, "词条表里有重复 key：\(duplicates.joined(separator: ", "))")
 }
 
+
+func testExportCropTo16x9() throws {
+    let fullScreen = CGSize(width: 2940, height: 1912)   // 实测：14 寸 MacBook 整屏 2x
+    let cropped = RecordingExportSettings(resolutionPreset: .p1080, bitRatePreset: .medium, cropTo16x9: true)
+    try expect(cropped.outputSize(for: fullScreen) == CGSize(width: 1920, height: 1080),
+               "16:9 裁切后应为 1920 x 1080")
+
+    let portraitSource = CGSize(width: 1080, height: 1920)
+    try expect(cropped.outputSize(for: portraitSource) == CGSize(width: 1080, height: 608),
+               "竖屏源裁成 16:9 时以长边为准")
+
+    let uncropped = RecordingExportSettings(resolutionPreset: .p1080, bitRatePreset: .medium, cropTo16x9: false)
+    try expect(uncropped.outputSize(for: fullScreen) == CGSize(width: 1920, height: 1248),
+               "不裁切时保持原始比例")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -645,7 +661,8 @@ let tests: [(String, () throws -> Void)] = [
     ("SpeechTrackingThreeCJKAnchorCrossesBreakTokens", testSpeechTrackingThreeCJKAnchorCrossesBreakTokens),
     ("RecordingEditorPresentation", testRecordingEditorPresentation),
     ("AIVoiceCommandParsing", testAIVoiceCommandParsing),
-    ("LocalizationDictionaryHasNoDuplicateKeys", testLocalizationDictionaryHasNoDuplicateKeys)
+    ("LocalizationDictionaryHasNoDuplicateKeys", testLocalizationDictionaryHasNoDuplicateKeys),
+    ("ExportCropTo16x9", testExportCropTo16x9)
 ]
 
 do {

@@ -117,14 +117,65 @@ nonisolated enum RecordingExportBitRatePreset: String, CaseIterable, Identifiabl
 nonisolated struct RecordingExportSettings: Equatable, Sendable {
     var resolutionPreset: RecordingExportResolutionPreset
     var bitRatePreset: RecordingExportBitRatePreset
+    /// 裁成 16:9。整屏录制的画面比例通常不是 16:9，直接上传会被加黑边。
+    var cropTo16x9: Bool = false
 
     static let `default` = RecordingExportSettings(
         resolutionPreset: .p1080,
-        bitRatePreset: .medium
+        bitRatePreset: .medium,
+        cropTo16x9: false
     )
 
+    private var resolutionPresetLongEdge: CGFloat {
+        resolutionPreset.outputSize(for: CGSize(width: 10_000, height: 10_000)).width
+    }
+
     func outputSize(for sourceSize: CGSize) -> CGSize {
-        resolutionPreset.outputSize(for: sourceSize)
+        Self.outputSize(
+            resolutionPreset: resolutionPreset,
+            longEdgeCap: resolutionPresetLongEdge,
+            sourceSize: sourceSize,
+            cropTo16x9: cropTo16x9
+        )
+    }
+
+    static func outputSize(
+        resolutionPreset: RecordingExportResolutionPreset,
+        longEdgeCap: CGFloat,
+        sourceSize: CGSize,
+        cropTo16x9: Bool
+    ) -> CGSize {
+        guard cropTo16x9 else { return resolutionPreset.outputSize(for: sourceSize) }
+
+        // 先按「居中裁成 16:9」算出裁切后的真实尺寸（短边保持不放大），
+        // 再套用分辨率预设的长边上限。
+        let sourceWidth = max(abs(sourceSize.width), 2)
+        let sourceHeight = max(abs(sourceSize.height), 2)
+        let targetAspect: CGFloat = 16.0 / 9.0
+        let sourceAspect = sourceWidth / sourceHeight
+
+        var croppedWidth = sourceWidth
+        var croppedHeight = sourceHeight
+        if sourceAspect > targetAspect {
+            // 源更宽：裁掉左右
+            croppedWidth = sourceHeight * targetAspect
+        } else {
+            // 源更高：裁掉上下
+            croppedHeight = sourceWidth / targetAspect
+        }
+
+        let longEdge = max(croppedWidth, croppedHeight)
+        let cap = longEdgeCap
+        let scale = longEdge > cap ? cap / longEdge : 1
+
+        return CGSize(
+            width: evenPixelDimension(croppedWidth * scale),
+            height: evenPixelDimension(croppedHeight * scale)
+        )
+    }
+
+    static func evenPixelDimension(_ value: CGFloat) -> CGFloat {
+        max(2, CGFloat(Int(value.rounded()) / 2 * 2))
     }
 
     func averageBitRate(for outputSize: CGSize) -> Int {

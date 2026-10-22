@@ -459,6 +459,7 @@ private struct RecordingEditorView: View {
     @State private var timelineResizeStartHeight: CGFloat?
     // 默认 1080p：录课够用，导出内存与耗时都是 4K 的四分之一
     @State private var exportResolutionPreset: RecordingExportResolutionPreset = .p1080
+    @State private var exportCropTo16x9 = false
     @State private var exportBitRatePreset: RecordingExportBitRatePreset = .medium
 
     private let minimumTimelineHeight: CGFloat = 190
@@ -471,7 +472,8 @@ private struct RecordingEditorView: View {
     private var exportSettings: RecordingExportSettings {
         RecordingExportSettings(
             resolutionPreset: exportResolutionPreset,
-            bitRatePreset: exportBitRatePreset
+            bitRatePreset: exportBitRatePreset,
+            cropTo16x9: exportCropTo16x9
         )
     }
 
@@ -613,6 +615,13 @@ private struct RecordingEditorView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
             }
+
+            Toggle(isOn: $exportCropTo16x9) {
+                Text(t("Crop to 16:9"))
+                    .font(.caption)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(t("Bitrate"))
