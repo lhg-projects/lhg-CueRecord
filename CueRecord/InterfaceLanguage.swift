@@ -47,6 +47,10 @@ final class InterfaceLanguageSettings: ObservableObject {
     }
 
     private static let zhHans: [String: String] = [
+        "Prompt backdrop": "提词区底板",
+        "0% keeps the prompt fully see-through: only the words cover the page, and the words stay sharp.": "0% 完全透空：只有字挡住页面，字本身始终清晰。",
+        "Live preview": "实时预览",
+        "This is how your script will look. Only the words cover the page.": "这是讲稿的显示效果，只有文字会挡住页面。",
         "Auto scroll": "自动滚动",
         "Turn it off to scroll the prompt only by hand.": "关掉后提词器不自动滚动，只由你手动控制。",
         "Exit Fullscreen": "退出全屏",

@@ -658,9 +658,10 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(showPromptFrame, forKey: "showPromptFrame") }
     }
 
-    /// 提词文字与虚线框的虚化程度（0 关闭，最大 20）。虚化的目的是让被盖住的内容还能辨认。
-    var promptBlurAmount: Double {
-        didSet { UserDefaults.standard.set(promptBlurAmount, forKey: "promptBlurAmount") }
+    /// 提词区底板的不透明度（0 = 完全透空，只有文字；1 = 有底板）。
+    /// 注意：这只影响「字后面那层板」，文字本身永远清晰。
+    var promptBackdropOpacity: Double {
+        didSet { UserDefaults.standard.set(promptBackdropOpacity, forKey: "promptBackdropOpacity") }
     }
 
     /// 提词字体家族，默认系统字体。
@@ -909,8 +910,8 @@ class NotchSettings {
         self.promptFontFamily = PrompterFontFamily(rawValue: UserDefaults.standard.string(forKey: "promptFontFamily") ?? "") ?? .system
         self.promptAutoScroll = UserDefaults.standard.object(forKey: "promptAutoScroll") as? Bool ?? true
         self.showPromptFrame = UserDefaults.standard.object(forKey: "showPromptFrame") as? Bool ?? true
-        let savedBlur = UserDefaults.standard.double(forKey: "promptBlurAmount")
-        self.promptBlurAmount = savedBlur > 0 ? savedBlur : 0
+        // 底板默认完全透空；老版本「虚化提词区」的旧值不再沿用（那是模糊文字，语义已废弃）
+        self.promptBackdropOpacity = UserDefaults.standard.object(forKey: "promptBackdropOpacity") as? Double ?? 0
         self.fontColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "fontColorPreset") ?? "") ?? .white
         self.cueColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "cueColorPreset") ?? "") ?? .white
         self.cueBrightness = CueBrightness(rawValue: UserDefaults.standard.string(forKey: "cueBrightness") ?? "") ?? .dim

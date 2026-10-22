@@ -828,7 +828,7 @@ struct NotchOverlayView: View {
                             prompterView
                                 .promptFrame(
                                     showFrame: NotchSettings.shared.showPromptFrame,
-                                    blurAmount: NotchSettings.shared.promptBlurAmount
+                                    backdropOpacity: NotchSettings.shared.promptBackdropOpacity
                                 )
                         }
                     }
@@ -1376,7 +1376,7 @@ struct FloatingOverlayView: View {
                     floatingPrompterView
                         .promptFrame(
                             showFrame: NotchSettings.shared.showPromptFrame,
-                            blurAmount: NotchSettings.shared.promptBlurAmount
+                            backdropOpacity: NotchSettings.shared.promptBackdropOpacity
                         )
                 }
             }

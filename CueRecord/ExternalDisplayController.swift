@@ -205,7 +205,7 @@ struct ExternalDisplayView: View {
                 prompterView
                     .promptFrame(
                         showFrame: NotchSettings.shared.showPromptFrame,
-                        blurAmount: NotchSettings.shared.promptBlurAmount
+                        backdropOpacity: NotchSettings.shared.promptBackdropOpacity
                     )
             }
         }

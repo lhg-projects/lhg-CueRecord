@@ -24,11 +24,19 @@ enum MemoryFootprint {
 
 struct PromptFrameModifier: ViewModifier {
     var showFrame: Bool
-    var blurAmount: Double
+    /// 0 = 完全透空，只有文字；中间值 = 一层半透底板，底下内容仍可见。
+    var backdropOpacity: Double
 
     func body(content: Content) -> some View {
         content
-            .blur(radius: blurAmount > 0 ? blurAmount : 0)
+            // 文字保持清晰，不做任何模糊
+            .background {
+                if backdropOpacity > 0.01 {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.black.opacity(backdropOpacity))
+                        .allowsHitTesting(false)
+                }
+            }
             .overlay {
                 if showFrame {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -44,8 +52,8 @@ struct PromptFrameModifier: ViewModifier {
 
 extension View {
     /// 提词文字与虚线框作为一个整体：虚化一起生效，虚线框不拦截点击。
-    func promptFrame(showFrame: Bool, blurAmount: Double) -> some View {
-        modifier(PromptFrameModifier(showFrame: showFrame, blurAmount: blurAmount))
+    func promptFrame(showFrame: Bool, backdropOpacity: Double) -> some View {
+        modifier(PromptFrameModifier(showFrame: showFrame, backdropOpacity: backdropOpacity))
     }
 }
 

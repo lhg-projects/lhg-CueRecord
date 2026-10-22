@@ -471,6 +471,45 @@ struct SettingsView: View {
 
     // MARK: - Appearance Tab
 
+
+    /// 设置面板里的实时预览：用当前字体/字号/底板/虚线框渲染一小段讲稿，
+    /// 底下垫一张模拟页面，方便直接看出「会不会压住背景」。
+    private var promptLivePreview: some View {
+        ZStack(alignment: .topLeading) {
+            LinearGradient(
+                colors: [Color(white: 0.92), Color(white: 0.82)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            // 模拟背景内容：几条"正文"
+            VStack(alignment: .leading, spacing: 9) {
+                ForEach(0..<5, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.black.opacity(0.18))
+                        .frame(width: index % 2 == 0 ? 260 : 200, height: 7)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
+
+            Text(previewSampleText)
+                .font(Font(settings.promptFontFamily.font(size: min(30, max(13, settings.promptFontSize * 0.42)))))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
+                .lineSpacing(4)
+                .padding(10)
+                .promptFrame(
+                    showFrame: settings.showPromptFrame,
+                    backdropOpacity: settings.promptBackdropOpacity
+                )
+                .padding(12)
+        }
+    }
+
+    private var previewSampleText: String {
+        t("This is how your script will look. Only the words cover the page.")
+    }
+
     private var appearanceTab: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
@@ -565,18 +604,28 @@ struct SettingsView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(t("Blur prompt"))
+                        Text(t("Prompt backdrop"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(String(format: "%.0f", settings.promptBlurAmount))
+                        Text("\(Int(settings.promptBackdropOpacity * 100))%")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.tertiary)
                     }
-                    Slider(value: $settings.promptBlurAmount, in: 0...20, step: 1)
-                    Text(t("Blur the prompt and the frame so what is behind them stays readable. 0 turns it off."))
+                    Slider(value: $settings.promptBackdropOpacity, in: 0...1, step: 0.05)
+                    Text(t("0% keeps the prompt fully see-through: only the words cover the page, and the words stay sharp."))
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
+                }
+
+                // 实时预览：改任何一项，这里立刻变
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(t("Live preview"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    promptLivePreview
+                        .frame(height: 132)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
 
                 Divider()
