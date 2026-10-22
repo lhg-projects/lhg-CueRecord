@@ -275,7 +275,7 @@ class NotchOverlayController: NSObject {
         // Start panel at full target size (SwiftUI animates the notch shape inside)
         let targetHeight = menuBarHeight + textAreaHeight
         let targetY = screenFrame.maxY - targetHeight
-        let xPosition = screenFrame.midX - notchWidth / 2
+        let xPosition = (screenFrame.midX - notchWidth / 2).rounded()
         let panel = NSPanel(
             contentRect: NSRect(x: xPosition, y: targetY, width: notchWidth, height: targetHeight),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -292,6 +292,8 @@ class NotchOverlayController: NSObject {
         panel.ignoresMouseEvents = false
         panel.sharingType = NotchSettings.shared.hideFromScreenShare ? .none : .readOnly
         panel.contentView = contentView
+        contentView.wantsLayer = true
+        contentView.layer?.contentsScale = panel.backingScaleFactor
 
         panel.orderFrontRegardless()
         self.panel = panel
@@ -337,6 +339,8 @@ class NotchOverlayController: NSObject {
         panel.ignoresMouseEvents = true
         panel.sharingType = NotchSettings.shared.hideFromScreenShare ? .none : .readOnly
         panel.contentView = contentView
+        contentView.wantsLayer = true
+        contentView.layer?.contentsScale = panel.backingScaleFactor
 
         panel.orderFrontRegardless()
         self.panel = panel
@@ -398,9 +402,9 @@ class NotchOverlayController: NSObject {
         let panelWidth = settings.notchWidth
         let panelHeight = settings.textAreaHeight
 
-        let xPosition = screenFrame.midX - panelWidth / 2
-        // 默认落在屏幕正中心
-        let yPosition = screenFrame.midY - panelHeight / 2
+        // 坐标必须取整：小数原点会让整块面板按亚像素采样，所有文字都会发虚
+        let xPosition = (screenFrame.midX - panelWidth / 2).rounded()
+        let yPosition = (screenFrame.midY - panelHeight / 2).rounded()
 
         let floatingView = FloatingOverlayView(
             content: overlayContent,
@@ -426,6 +430,8 @@ class NotchOverlayController: NSObject {
         panel.maxSize = NSSize(width: 500, height: panelHeight + 350)
         panel.sharingType = NotchSettings.shared.hideFromScreenShare ? .none : .readOnly
         panel.contentView = contentView
+        contentView.wantsLayer = true
+        contentView.layer?.contentsScale = panel.backingScaleFactor
 
         panel.orderFrontRegardless()
         self.panel = panel
@@ -837,8 +843,8 @@ struct NotchOverlayView: View {
                     .clipped()
                     // 全透明模式下没有底板托底，靠一圈暗影保证文字在任何壁纸/文档上都读得清
                     .shadow(
-                        color: backgroundMode == .clear ? .black.opacity(0.9) : .clear,
-                        radius: backgroundMode == .clear ? 3 : 0
+                        color: backgroundMode == .clear ? .black.opacity(0.55) : .clear,
+                        radius: backgroundMode == .clear ? 1 : 0
                     )
                     .transition(.opacity)
                 }

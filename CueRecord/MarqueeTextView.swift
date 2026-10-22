@@ -141,8 +141,8 @@ struct SpeechScrollView: View {
             .overlay(
                 ScrollWheelView(
                     onScroll: { delta in
-                        let canScroll = smoothScroll ? isListening : !isListening
-                        guard canScroll else { return }
+                        // 鼠标在提词区内滚动，就应该滚提词——不再按模式做额外门禁，
+                        // 否则事件被吞掉、文字却不动，比不接管更糟。
 
                         // Pause timer when user starts scrolling in smooth mode
                         if smoothScroll && !isUserScrolling {
@@ -757,8 +757,11 @@ final class ScrollWheelNSView: NSView {
                 return event
             }
 
+            var consumed = false
+
             if isInside {
                 self.isHandlingScroll = true
+                consumed = true
                 let delta = event.scrollingDeltaY
                 let scaled = event.hasPreciseScrollingDeltas ? delta : delta * 10
                 if scaled != 0 {
@@ -769,11 +772,14 @@ final class ScrollWheelNSView: NSView {
             if isEnding {
                 if self.isHandlingScroll {
                     self.onScrollEnd?()
+                    consumed = true
                 }
                 self.isHandlingScroll = false
             }
 
-            return event
+            // 关键：框内滚动要「吃掉」事件，否则同一份滚动会继续传给下层页面，
+            // 用户看到的就是「提词器和页面一起滚」。
+            return consumed ? nil : event
         }
     }
 
