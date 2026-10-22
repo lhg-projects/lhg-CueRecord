@@ -294,6 +294,9 @@ class NotchOverlayController: NSObject {
         panel.contentView = contentView
         contentView.wantsLayer = true
         contentView.layer?.contentsScale = panel.backingScaleFactor
+        // 关背景时，宿主视图这层也不能有不透明底，否则透空设置会被这一层黑底盖掉
+        contentView.layer?.backgroundColor = NSColor.clear.cgColor
+        contentView.layer?.isOpaque = false
 
         panel.orderFrontRegardless()
         self.panel = panel
@@ -341,6 +344,9 @@ class NotchOverlayController: NSObject {
         panel.contentView = contentView
         contentView.wantsLayer = true
         contentView.layer?.contentsScale = panel.backingScaleFactor
+        // 关背景时，宿主视图这层也不能有不透明底，否则透空设置会被这一层黑底盖掉
+        contentView.layer?.backgroundColor = NSColor.clear.cgColor
+        contentView.layer?.isOpaque = false
 
         panel.orderFrontRegardless()
         self.panel = panel
@@ -432,6 +438,9 @@ class NotchOverlayController: NSObject {
         panel.contentView = contentView
         contentView.wantsLayer = true
         contentView.layer?.contentsScale = panel.backingScaleFactor
+        // 关背景时，宿主视图这层也不能有不透明底，否则透空设置会被这一层黑底盖掉
+        contentView.layer?.backgroundColor = NSColor.clear.cgColor
+        contentView.layer?.isOpaque = false
 
         panel.orderFrontRegardless()
         self.panel = panel
