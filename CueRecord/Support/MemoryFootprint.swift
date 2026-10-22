@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// 轻量的内存足迹打点。排查内存暴涨时，用它把「哪个阶段在涨」变成数字。
 enum MemoryFootprint {
@@ -18,3 +19,33 @@ enum MemoryFootprint {
         print("📊 \(tag): \(String(format: "%.1f", megabytes())) MB")
     }
 }
+
+// MARK: - 提词区外观（虚线框 + 虚化）
+
+struct PromptFrameModifier: ViewModifier {
+    var showFrame: Bool
+    var blurAmount: Double
+
+    func body(content: Content) -> some View {
+        content
+            .blur(radius: blurAmount > 0 ? blurAmount : 0)
+            .overlay {
+                if showFrame {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(
+                            Color.white.opacity(0.35),
+                            style: StrokeStyle(lineWidth: 1, dash: [6, 5])
+                        )
+                        .allowsHitTesting(false)
+                }
+            }
+    }
+}
+
+extension View {
+    /// 提词文字与虚线框作为一个整体：虚化一起生效，虚线框不拦截点击。
+    func promptFrame(showFrame: Bool, blurAmount: Double) -> some View {
+        modifier(PromptFrameModifier(showFrame: showFrame, blurAmount: blurAmount))
+    }
+}
+

@@ -47,6 +47,17 @@ final class InterfaceLanguageSettings: ObservableObject {
     }
 
     private static let zhHans: [String: String] = [
+        "Dashed frame around the prompt": "提词区显示虚线框",
+        "Blur prompt": "虚化提词区",
+        "Blur the prompt and the frame so what is behind them stays readable. 0 turns it off.": "把提词文字和虚线框一起虚化，让被盖住的内容还能看清。0 表示关闭。",
+        "System": "系统",
+        "Songti": "宋体",
+        "Kaiti": "楷体",
+        "Yuanti": "圆体",
+        "Xingkai": "行楷",
+        "Handwriting": "手写体",
+        "Not installed": "未安装",
+        "16–96 pt，默认 40。投影和录屏通用；讲稿密就往大调。": "16–96 pt，默认 40。投影和录屏通用；讲稿密就往大调。",
         "Crop to 16:9": "裁成 16:9",
         "Turned it on in System Settings? Restart the app for it to take effect.": "已经在系统设置里打开了？重启应用才生效。",
         "Restart App": "重启应用",

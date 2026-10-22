@@ -173,19 +173,38 @@ struct ExternalDisplayView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            // 全屏模式也要能「关背景」：关掉就是桌面直接透出，只有字
+            Group {
+                switch NotchSettings.shared.overlayBackgroundMode {
+                case .solid:
+                    Color.black
+                case .blur:
+                    ZStack {
+                        NotchBlurView()
+                        Color.black.opacity(0.45)
+                    }
+                case .clear:
+                    Color.clear
+                }
+            }
+            .ignoresSafeArea()
 
             TeleprompterBackdropView(
                 settings: NotchSettings.shared,
                 audienceFaceOpacity: 0.12,
                 audienceFaceVerticalPosition: 0.54
             )
+            .opacity(NotchSettings.shared.overlayBackgroundMode == .clear ? 0 : 1)
             .ignoresSafeArea()
 
             if isDone && (listeningMode == .wordTracking || hasNextPage) {
                 doneView
             } else {
                 prompterView
+                    .promptFrame(
+                        showFrame: NotchSettings.shared.showPromptFrame,
+                        blurAmount: NotchSettings.shared.promptBlurAmount
+                    )
             }
         }
         .overlay(alignment: .topTrailing) {

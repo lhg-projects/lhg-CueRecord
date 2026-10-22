@@ -363,8 +363,10 @@ class NotchOverlayController: NSObject {
             backing: .buffered,
             defer: false
         )
-        panel.isOpaque = true
-        panel.backgroundColor = .black
+        // 关背景时窗口本身必须透明，否则盖上去就是一整块黑
+        let fullscreenTransparent = settings.overlayBackgroundMode != .solid
+        panel.isOpaque = !fullscreenTransparent
+        panel.backgroundColor = fullscreenTransparent ? .clear : .black
         panel.hasShadow = false
         panel.level = .screenSaver
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -385,7 +387,8 @@ class NotchOverlayController: NSObject {
         let panelHeight = settings.textAreaHeight
 
         let xPosition = screenFrame.midX - panelWidth / 2
-        let yPosition = screenFrame.midY - panelHeight / 2 + 100
+        // 默认落在屏幕正中心
+        let yPosition = screenFrame.midY - panelHeight / 2
 
         let floatingView = FloatingOverlayView(
             content: overlayContent,
@@ -811,6 +814,10 @@ struct NotchOverlayView: View {
                             doneView
                         } else {
                             prompterView
+                                .promptFrame(
+                                    showFrame: NotchSettings.shared.showPromptFrame,
+                                    blurAmount: NotchSettings.shared.promptBlurAmount
+                                )
                         }
                     }
                     .padding(.horizontal, topInset)
@@ -1355,6 +1362,10 @@ struct FloatingOverlayView: View {
                     floatingDoneView
                 } else {
                     floatingPrompterView
+                        .promptFrame(
+                            showFrame: NotchSettings.shared.showPromptFrame,
+                            blurAmount: NotchSettings.shared.promptBlurAmount
+                        )
                 }
             }
         }

@@ -6,6 +6,54 @@
 
 import SwiftUI
 
+
+// MARK: - Prompter Font Family（macOS 自带字体，缺失时回落系统字体）
+
+enum PrompterFontFamily: String, CaseIterable, Identifiable {
+    case system
+    case songti
+    case kaiti
+    case yuanti
+    case xingkai
+    case hannotate
+
+    var id: String { rawValue }
+
+    var localizedLabel: String {
+        switch self {
+        case .system:    return InterfaceLanguageSettings.shared.text("System")
+        case .songti:    return InterfaceLanguageSettings.shared.text("Songti")
+        case .kaiti:     return InterfaceLanguageSettings.shared.text("Kaiti")
+        case .yuanti:    return InterfaceLanguageSettings.shared.text("Yuanti")
+        case .xingkai:   return InterfaceLanguageSettings.shared.text("Xingkai")
+        case .hannotate: return InterfaceLanguageSettings.shared.text("Handwriting")
+        }
+    }
+
+    private var candidates: [String] {
+        switch self {
+        case .system:    return []
+        case .songti:    return ["SongtiSC-Regular", "STSong"]
+        case .kaiti:     return ["KaitiSC-Regular", "STKaiti"]
+        case .yuanti:    return ["YuantiSC-Regular", "STYuanti-SC-Regular"]
+        case .xingkai:   return ["XingkaiSC-Regular", "STXingkai-SC-Light"]
+        case .hannotate: return ["HannotateSC-W5", "HannotateSC-W7", "WawatiSC-Regular"]
+        }
+    }
+
+    var isAvailable: Bool {
+        guard !candidates.isEmpty else { return true }
+        return candidates.contains { NSFont(name: $0, size: 12) != nil }
+    }
+
+    func font(size: CGFloat, weight: NSFont.Weight = .semibold) -> NSFont {
+        for name in candidates {
+            if let font = NSFont(name: name, size: size) { return font }
+        }
+        return NSFont.systemFont(ofSize: size, weight: weight)
+    }
+}
+
 // MARK: - Font Size Preset
 
 enum FontSizePreset: String, CaseIterable, Identifiable {
@@ -595,6 +643,26 @@ class NotchSettings {
         }
     }
 
+    /// 提词字号（pt）。16–96，默认 40。
+    var promptFontSize: CGFloat {
+        didSet { UserDefaults.standard.set(Double(promptFontSize), forKey: "promptFontSize") }
+    }
+
+    /// 提词文字区是否画虚线框（只在屏幕上显示，不进成片）。
+    var showPromptFrame: Bool {
+        didSet { UserDefaults.standard.set(showPromptFrame, forKey: "showPromptFrame") }
+    }
+
+    /// 提词文字与虚线框的虚化程度（0 关闭，最大 20）。虚化的目的是让被盖住的内容还能辨认。
+    var promptBlurAmount: Double {
+        didSet { UserDefaults.standard.set(promptBlurAmount, forKey: "promptBlurAmount") }
+    }
+
+    /// 提词字体家族，默认系统字体。
+    var promptFontFamily: PrompterFontFamily {
+        didSet { UserDefaults.standard.set(promptFontFamily.rawValue, forKey: "promptFontFamily") }
+    }
+
     var fontColorPreset: FontColorPreset {
         didSet { UserDefaults.standard.set(fontColorPreset.rawValue, forKey: "fontColorPreset") }
     }
@@ -746,7 +814,7 @@ class NotchSettings {
     }
 
     var font: NSFont {
-        fontFamilyPreset.font(size: fontSizePreset.pointSize)
+        promptFontFamily.font(size: promptFontSize)
     }
 
     var customBackgroundImageURL: URL? {
@@ -825,6 +893,18 @@ class NotchSettings {
         self.speechLocale = UserDefaults.standard.string(forKey: "speechLocale") ?? Self.defaultLocale
         self.fontSizePreset = initialFontSizePreset
         self.fontFamilyPreset = initialFontFamilyPreset
+        // 字号：新键优先；老版本只有四档，按档位折算成 pt
+        if UserDefaults.standard.object(forKey: "promptFontSize") != nil {
+            let savedSize = UserDefaults.standard.double(forKey: "promptFontSize")
+            self.promptFontSize = savedSize > 0 ? CGFloat(savedSize) : 40
+        } else {
+            self.promptFontSize = initialFontSizePreset == .xl ? 48
+                : (initialFontSizePreset == .lg ? 40 : (initialFontSizePreset == .sm ? 28 : 22))
+        }
+        self.promptFontFamily = PrompterFontFamily(rawValue: UserDefaults.standard.string(forKey: "promptFontFamily") ?? "") ?? .system
+        self.showPromptFrame = UserDefaults.standard.object(forKey: "showPromptFrame") as? Bool ?? true
+        let savedBlur = UserDefaults.standard.double(forKey: "promptBlurAmount")
+        self.promptBlurAmount = savedBlur > 0 ? savedBlur : 0
         self.fontColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "fontColorPreset") ?? "") ?? .white
         self.cueColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "cueColorPreset") ?? "") ?? .white
         self.cueBrightness = CueBrightness(rawValue: UserDefaults.standard.string(forKey: "cueBrightness") ?? "") ?? .dim

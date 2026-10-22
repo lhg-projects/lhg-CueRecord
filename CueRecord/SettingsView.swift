@@ -478,30 +478,37 @@ struct SettingsView: View {
                 Text(t("Font"))
                     .font(.system(size: 13, weight: .medium))
 
-                HStack(spacing: 8) {
-                    ForEach(FontFamilyPreset.allCases) { preset in
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(PrompterFontFamily.allCases) { family in
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.fontFamilyPreset = preset
+                                settings.promptFontFamily = family
                             }
                         } label: {
                             VStack(spacing: 6) {
-                                Text("Ag")
-                                    .font(Font(preset.font(size: 16)))
-                                    .foregroundStyle(settings.fontFamilyPreset == preset ? Color.accentColor : .primary)
-                                Text(preset.localizedLabel)
+                                Text("讲稿 Aa")
+                                    .font(Font(family.font(size: 15)))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                    .foregroundStyle(settings.promptFontFamily == family ? Color.accentColor : .primary)
+                                Text(family.localizedLabel)
                                     .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(settings.fontFamilyPreset == preset ? Color.accentColor : .secondary)
+                                    .foregroundStyle(settings.promptFontFamily == family ? Color.accentColor : .secondary)
+                                if !family.isAvailable {
+                                    Text(t("Not installed"))
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(.tertiary)
+                                }
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 10)
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(settings.fontFamilyPreset == preset ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.05))
+                                    .fill(settings.promptFontFamily == family ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.05))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(settings.fontFamilyPreset == preset ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                                    .strokeBorder(settings.promptFontFamily == family ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1.5)
                             )
                         }
                         .buttonStyle(.plain)
@@ -512,34 +519,53 @@ struct SettingsView: View {
                 Text(t("Size"))
                     .font(.system(size: 13, weight: .medium))
 
-                HStack(spacing: 8) {
-                    ForEach(FontSizePreset.allCases) { preset in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.fontSizePreset = preset
-                            }
-                        } label: {
-                            VStack(spacing: 6) {
-                                Text("Ag")
-                                    .font(Font(settings.fontFamilyPreset.font(size: preset.pointSize * 0.7)))
-                                    .foregroundStyle(settings.fontSizePreset == preset ? Color.accentColor : .primary)
-                                Text(preset.label)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(settings.fontSizePreset == preset ? Color.accentColor : .secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(settings.fontSizePreset == preset ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.05))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(settings.fontSizePreset == preset ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1.5)
-                            )
-                        }
-                        .buttonStyle(.plain)
+                HStack(spacing: 12) {
+                    Slider(
+                        value: Binding(
+                            get: { Double(settings.promptFontSize) },
+                            set: { settings.promptFontSize = CGFloat(($0 / 2).rounded() * 2) }
+                        ),
+                        in: 16...96,
+                        step: 2
+                    )
+                    Text("\(Int(settings.promptFontSize)) pt")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 56, alignment: .trailing)
+                    Stepper("", value: Binding(
+                        get: { Double(settings.promptFontSize) },
+                        set: { settings.promptFontSize = CGFloat(min(96, max(16, $0))) }
+                    ), in: 16...96, step: 2)
+                    .labelsHidden()
+                }
+
+                Text(t("16–96 pt，默认 40。投影和录屏通用；讲稿密就往大调。"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                Divider()
+
+                Toggle(isOn: $settings.showPromptFrame) {
+                    Text(t("Dashed frame around the prompt"))
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(t("Blur prompt"))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(String(format: "%.0f", settings.promptBlurAmount))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.tertiary)
                     }
+                    Slider(value: $settings.promptBlurAmount, in: 0...20, step: 1)
+                    Text(t("Blur the prompt and the frame so what is behind them stays readable. 0 turns it off."))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
                 }
 
                 Divider()
