@@ -967,7 +967,7 @@ struct SettingsView: View {
 
                 Divider()
 
-                Text(t("Background"))
+                Text(t("Backdrop image"))
                     .font(.system(size: 13, weight: .medium))
 
                 Picker("", selection: $settings.audienceFace) {
@@ -987,6 +987,61 @@ struct SettingsView: View {
                 }
 
                 teleprompterBackgroundPreview
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(t("Panel background"))
+                        .font(.system(size: 13, weight: .medium))
+                    Picker("", selection: $settings.overlayBackgroundMode) {
+                        ForEach(OverlayBackgroundMode.allCases) { mode in
+                            Text(mode.localizedLabel).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+
+                Text(t("This is the layer behind the text. Set it to Clear to see through to your desktop."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+
+                Text(settings.overlayBackgroundMode == .clear
+                     ? t("Only the text is drawn. Nothing covers the screen behind it.")
+                     : settings.overlayBackgroundMode == .blur
+                     ? t("Blurred glass you can see through.")
+                     : t("Solid background."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                if settings.overlayBackgroundMode == .blur {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(t("Amount"))
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(Int(settings.overlayTransparencyOpacity * 100))%")
+                                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Slider(
+                            value: $settings.overlayTransparencyOpacity,
+                            in: 0.2...0.95,
+                            step: 0.05
+                        )
+                        HStack {
+                            Text(t("More transparent"))
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                            Spacer()
+                            Text(t("Less transparent"))
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
 
                 if settings.overlayMode == .pinned {
                     Divider()
@@ -1014,60 +1069,6 @@ struct SettingsView: View {
                         )
                     }
 
-                    Divider()
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(t("Panel background"))
-                            .font(.system(size: 13, weight: .medium))
-                        Picker("", selection: $settings.overlayBackgroundMode) {
-                            ForEach(OverlayBackgroundMode.allCases) { mode in
-                                Text(mode.localizedLabel).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                    }
-
-                    Text(t("This is the layer behind the text. Set it to Clear to see through to your desktop."))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-
-                    Text(settings.overlayBackgroundMode == .clear
-                         ? t("Only the text is drawn. Nothing covers the screen behind it.")
-                         : settings.overlayBackgroundMode == .blur
-                         ? t("Blurred glass you can see through.")
-                         : t("Solid background."))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-
-                    if settings.overlayBackgroundMode == .blur {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(t("Amount"))
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text("\(Int(settings.overlayTransparencyOpacity * 100))%")
-                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            Slider(
-                                value: $settings.overlayTransparencyOpacity,
-                                in: 0.2...0.95,
-                                step: 0.05
-                            )
-                            HStack {
-                                Text(t("More transparent"))
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.tertiary)
-                                Spacer()
-                                Text(t("Less transparent"))
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
                 }
 
                 if settings.overlayMode == .floating {
