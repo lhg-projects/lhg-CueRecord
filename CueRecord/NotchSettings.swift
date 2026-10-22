@@ -19,6 +19,20 @@ enum PrompterFontFamily: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// 用字体族名解析，而不是写死 PostScript 名——
+    /// 之前写死 SongtiSC-Regular / KaitiSC-Regular 这类名字是错的，
+    /// 真实名字是 STSongti-SC-Regular、STKaitiSC-Regular，导致六款字体全部回落到系统字体。
+    var familyName: String? {
+        switch self {
+        case .system:    return nil
+        case .songti:    return "Songti SC"
+        case .kaiti:     return "Kaiti SC"
+        case .yuanti:    return "Yuanti SC"
+        case .xingkai:   return "Xingkai SC"
+        case .hannotate: return "Hannotate SC"
+        }
+    }
+
     var localizedLabel: String {
         switch self {
         case .system:    return InterfaceLanguageSettings.shared.text("System")
@@ -30,27 +44,69 @@ enum PrompterFontFamily: String, CaseIterable, Identifiable {
         }
     }
 
-    private var candidates: [String] {
-        switch self {
-        case .system:    return []
-        case .songti:    return ["SongtiSC-Regular", "STSong"]
-        case .kaiti:     return ["KaitiSC-Regular", "STKaiti"]
-        case .yuanti:    return ["YuantiSC-Regular", "STYuanti-SC-Regular"]
-        case .xingkai:   return ["XingkaiSC-Regular", "STXingkai-SC-Light"]
-        case .hannotate: return ["HannotateSC-W5", "HannotateSC-W7", "WawatiSC-Regular"]
-        }
+    /// 该字体族是否已经装在这台机器上
+    var isAvailable: Bool {
+        guard let familyName else { return true }
+        if Self.installedFamilies.contains(familyName) { return true }
+        return Self.resolveDescriptor(familyName) != nil
     }
 
-    var isAvailable: Bool {
-        guard !candidates.isEmpty else { return true }
-        return candidates.contains { NSFont(name: $0, size: 12) != nil }
+    /// 未安装但系统能按需下载
+    var isDownloadable: Bool {
+        guard let familyName, !isAvailable else { return false }
+        let attributes: [CFString: Any] = [
+            kCTFontFamilyNameAttribute: familyName,
+            kCTFontDownloadableAttribute: true
+        ]
+        let descriptor = CTFontDescriptorCreateWithAttributes(attributes as CFDictionary)
+        let matches = CTFontDescriptorCreateMatchingFontDescriptors(descriptor, nil) as? [CTFontDescriptor]
+        return !(matches ?? []).isEmpty
     }
 
     func font(size: CGFloat, weight: NSFont.Weight = .semibold) -> NSFont {
-        for name in candidates {
-            if let font = NSFont(name: name, size: size) { return font }
+        if let familyName, let font = Self.font(inFamily: familyName, size: size) {
+            return font
         }
         return NSFont.systemFont(ofSize: size, weight: weight)
+    }
+
+    // MARK: - 解析
+
+    private static var installedFamilies: Set<String> {
+        Set(NSFontManager.shared.availableFontFamilies)
+    }
+
+    private static func resolveDescriptor(_ family: String) -> CTFontDescriptor? {
+        let descriptor = CTFontDescriptorCreateWithAttributes(
+            [kCTFontFamilyNameAttribute: family] as CFDictionary
+        )
+        let matches = CTFontDescriptorCreateMatchingFontDescriptors(descriptor, nil) as? [CTFontDescriptor]
+        return matches?.first
+    }
+
+    private static func font(inFamily family: String, size: CGFloat) -> NSFont? {
+        guard let descriptor = resolveDescriptor(family) else { return nil }
+        // 注意：不能用 CTFontCreateWithFontDescriptor(...) as NSFont，那个转换不可靠，
+        // 运行时拿到的不是 NSFont，取 fontName 会崩。NSFont(descriptor:size:) 是正规入口。
+        return NSFont(descriptor: descriptor, size: size)
+    }
+
+    /// 触发系统按需下载（macOS 的可选字体）。进度回调只用来刷新界面状态。
+    static func download(family: String, completion: @escaping (Bool) -> Void) {
+        let attributes: [CFString: Any] = [kCTFontFamilyNameAttribute: family]
+        let descriptor = CTFontDescriptorCreateWithAttributes(attributes as CFDictionary)
+        CTFontDescriptorMatchFontDescriptorsWithProgressHandler([descriptor] as CFArray, nil) { state, _ in
+            switch state {
+            case .didFinish:
+                DispatchQueue.main.async { completion(true) }
+                return false
+            case .didFailWithError:
+                DispatchQueue.main.async { completion(false) }
+                return false
+            default:
+                return true
+            }
+        }
     }
 }
 

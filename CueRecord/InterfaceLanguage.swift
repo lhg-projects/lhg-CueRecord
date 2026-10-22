@@ -47,6 +47,8 @@ final class InterfaceLanguageSettings: ObservableObject {
     }
 
     private static let zhHans: [String: String] = [
+        "Download": "下载",
+        "Downloading": "下载中",
         "Prompt backdrop": "提词区底板",
         "0% keeps the prompt fully see-through: only the words cover the page, and the words stay sharp.": "0% 完全透空：只有字挡住页面，字本身始终清晰。",
         "Live preview": "实时预览",

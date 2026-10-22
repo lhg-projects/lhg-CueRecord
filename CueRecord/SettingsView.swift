@@ -316,6 +316,8 @@ struct SettingsView: View {
     @State private var previewController = NotchPreviewController()
     @State private var selectedTab: SettingsTab
     @State private var showResetConfirmation = false
+    @State private var downloadingFont: PrompterFontFamily?
+    @State private var fontRefreshToken = UUID()
     @State private var voiceCommandsEnabled = AIVoiceAssistant.shared.isCommandRecognitionEnabled
     @State private var voiceModelAssist = AIVoiceAssistant.shared.isModelAssistEnabled
 
@@ -534,9 +536,34 @@ struct SettingsView: View {
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(settings.promptFontFamily == family ? Color.accentColor : .secondary)
                                 if !family.isAvailable {
-                                    Text(t("Not installed"))
-                                        .font(.system(size: 9))
-                                        .foregroundStyle(.tertiary)
+                                    if family.isDownloadable {
+                                        Button {
+                                            downloadingFont = family
+                                            PrompterFontFamily.download(family: family.familyName ?? "") { ok in
+                                                downloadingFont = nil
+                                                if ok {
+                                                    settings.promptFontFamily = family
+                                                    fontRefreshToken = UUID()
+                                                }
+                                            }
+                                        } label: {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "arrow.down.circle")
+                                                    .font(.system(size: 9))
+                                                Text(downloadingFont == family
+                                                     ? t("Downloading")
+                                                     : t("Download"))
+                                                    .font(.system(size: 9))
+                                            }
+                                            .foregroundStyle(.tertiary)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .disabled(downloadingFont != nil)
+                                    } else {
+                                        Text(t("Not installed"))
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(.tertiary)
+                                    }
                                 }
                             }
                             .frame(maxWidth: .infinity)
