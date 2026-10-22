@@ -439,7 +439,8 @@ class NotchOverlayController: NSObject {
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        // 全透明时不要阴影：阴影会沿内容轮廓画出一圈黑边
+        panel.hasShadow = settings.overlayBackgroundMode != .clear
         panel.level = .screenSaver
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.ignoresMouseEvents = false
@@ -1408,24 +1409,29 @@ struct FloatingOverlayView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 全透明时和「固定到刘海」走同一条路：什么都不画，只有文字浮在桌面上
         .background(
             Group {
-                if NotchSettings.shared.overlayBackgroundMode == .clear {
-                    Color.clear
-                } else if NotchSettings.shared.overlayBackgroundMode == .blur || NotchSettings.shared.floatingGlassEffect {
+                if NotchSettings.shared.overlayBackgroundMode == .blur || NotchSettings.shared.floatingGlassEffect {
                     ZStack {
                         GlassEffectView()
                         RoundedRectangle(cornerRadius: 16)
                             .fill(.black.opacity(NotchSettings.shared.glassOpacity))
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 16))
-                } else {
+                } else if NotchSettings.shared.overlayBackgroundMode == .solid {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(.black)
+                } else {
+                    Color.clear
                 }
             }
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(
+            NotchSettings.shared.overlayBackgroundMode == .clear
+                ? AnyShape(Rectangle())
+                : AnyShape(RoundedRectangle(cornerRadius: 16))
+        )
         .opacity(appeared ? 1 : 0)
         .scaleEffect(appeared ? 1 : 0.9)
         .onAppear {
