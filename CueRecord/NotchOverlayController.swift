@@ -841,11 +841,6 @@ struct NotchOverlayView: View {
                     .padding(.horizontal, topInset)
                     .frame(width: currentWidth, height: targetHeight)
                     .clipped()
-                    // 全透明模式下没有底板托底，靠一圈暗影保证文字在任何壁纸/文档上都读得清
-                    .shadow(
-                        color: backgroundMode == .clear ? .black.opacity(0.55) : .clear,
-                        radius: backgroundMode == .clear ? 1 : 0
-                    )
                     .transition(.opacity)
                 }
             }
