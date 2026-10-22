@@ -294,6 +294,10 @@ class NotchOverlayController: NSObject {
         panel.contentView = contentView
         contentView.wantsLayer = true
         contentView.layer?.contentsScale = panel.backingScaleFactor
+        contentView.layer?.backgroundColor = NSColor.clear.cgColor
+        contentView.layer?.isOpaque = false
+        contentView.wantsLayer = true
+        contentView.layer?.contentsScale = panel.backingScaleFactor
         // 关背景时，宿主视图这层也不能有不透明底，否则透空设置会被这一层黑底盖掉
         contentView.layer?.backgroundColor = NSColor.clear.cgColor
         contentView.layer?.isOpaque = false
@@ -342,6 +346,10 @@ class NotchOverlayController: NSObject {
         panel.ignoresMouseEvents = true
         panel.sharingType = NotchSettings.shared.hideFromScreenShare ? .none : .readOnly
         panel.contentView = contentView
+        contentView.wantsLayer = true
+        contentView.layer?.contentsScale = panel.backingScaleFactor
+        contentView.layer?.backgroundColor = NSColor.clear.cgColor
+        contentView.layer?.isOpaque = false
         contentView.wantsLayer = true
         contentView.layer?.contentsScale = panel.backingScaleFactor
         // 关背景时，宿主视图这层也不能有不透明底，否则透空设置会被这一层黑底盖掉
@@ -395,6 +403,10 @@ class NotchOverlayController: NSObject {
         panel.ignoresMouseEvents = false
         panel.sharingType = settings.hideFromScreenShare ? .none : .readOnly
         panel.contentView = contentView
+        contentView.wantsLayer = true
+        contentView.layer?.contentsScale = panel.backingScaleFactor
+        contentView.layer?.backgroundColor = NSColor.clear.cgColor
+        contentView.layer?.isOpaque = false
         panel.setFrame(screenFrame, display: true)
         panel.orderFrontRegardless()
         self.panel = panel
@@ -436,6 +448,10 @@ class NotchOverlayController: NSObject {
         panel.maxSize = NSSize(width: 500, height: panelHeight + 350)
         panel.sharingType = NotchSettings.shared.hideFromScreenShare ? .none : .readOnly
         panel.contentView = contentView
+        contentView.wantsLayer = true
+        contentView.layer?.contentsScale = panel.backingScaleFactor
+        contentView.layer?.backgroundColor = NSColor.clear.cgColor
+        contentView.layer?.isOpaque = false
         contentView.wantsLayer = true
         contentView.layer?.contentsScale = panel.backingScaleFactor
         // 关背景时，宿主视图这层也不能有不透明底，否则透空设置会被这一层黑底盖掉

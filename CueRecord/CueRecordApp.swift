@@ -30,6 +30,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+
         NSApp.servicesProvider = CueRecordService.shared
         NSUpdateDynamicServices()
 
