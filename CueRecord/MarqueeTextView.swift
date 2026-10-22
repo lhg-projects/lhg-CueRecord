@@ -336,7 +336,8 @@ struct WordFlowLayout: View {
         let intrinsicHeight = font.ascender - font.descender + font.leading
         let ratio = intrinsicHeight / font.pointSize
         // System fonts: ratio ~1.2, OpenDyslexic: ratio ~1.7+
-        return ratio > 1.5 ? 2 : 8
+        // 行距按行高比例算，字号变大时不会显得挤
+        return ratio > 1.5 ? 2 : max(6, (intrinsicHeight * 0.48).rounded())
     }
 
     private var fastPaceColor: Color {
@@ -434,6 +435,11 @@ struct WordFlowLayout: View {
                 .font(displayFont(for: item))
                 .foregroundStyle(uniformColor(for: item, isFast: isFast, isSlow: isSlow))
                 .tracking(slowTracking)
+                // 1px 深色描边：零半径，不糊字，但任何背景上都读得清
+                .shadow(color: .black.opacity(0.75), radius: 0, x: 1, y: 0)
+                .shadow(color: .black.opacity(0.75), radius: 0, x: -1, y: 0)
+                .shadow(color: .black.opacity(0.75), radius: 0, x: 0, y: 1)
+                .shadow(color: .black.opacity(0.75), radius: 0, x: 0, y: -1)
                 .background(
                     GeometryReader { wordGeo in
                         Color.clear.preference(

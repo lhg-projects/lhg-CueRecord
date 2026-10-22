@@ -203,6 +203,9 @@ struct ExternalDisplayView: View {
                 doneView
             } else {
                 prompterView
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: NotchSettings.shared.promptFontSize * 24)
                     .promptFrame(
                         showFrame: NotchSettings.shared.showPromptFrame,
                         backdropOpacity: NotchSettings.shared.promptBackdropOpacity

@@ -858,6 +858,9 @@ struct NotchOverlayView: View {
                             doneView
                         } else {
                             prompterView
+                                .padding(.horizontal, 22)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: NotchSettings.shared.promptFontSize * 24)
                                 .promptFrame(
                                     showFrame: NotchSettings.shared.showPromptFrame,
                                     backdropOpacity: NotchSettings.shared.promptBackdropOpacity
@@ -1401,6 +1404,9 @@ struct FloatingOverlayView: View {
                     floatingDoneView
                 } else {
                     floatingPrompterView
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 16)
+                        .frame(maxWidth: NotchSettings.shared.promptFontSize * 24)
                         .promptFrame(
                             showFrame: NotchSettings.shared.showPromptFrame,
                             backdropOpacity: NotchSettings.shared.promptBackdropOpacity
