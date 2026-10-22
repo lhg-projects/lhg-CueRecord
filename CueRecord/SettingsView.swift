@@ -1017,7 +1017,7 @@ struct SettingsView: View {
                     Divider()
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(t("Background"))
+                        Text(t("Panel background"))
                             .font(.system(size: 13, weight: .medium))
                         Picker("", selection: $settings.overlayBackgroundMode) {
                             ForEach(OverlayBackgroundMode.allCases) { mode in
@@ -1027,6 +1027,10 @@ struct SettingsView: View {
                         .pickerStyle(.segmented)
                         .labelsHidden()
                     }
+
+                    Text(t("This is the layer behind the text. Set it to Clear to see through to your desktop."))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
 
                     Text(settings.overlayBackgroundMode == .clear
                          ? t("Only the text is drawn. Nothing covers the screen behind it.")

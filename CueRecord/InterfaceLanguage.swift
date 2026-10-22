@@ -47,6 +47,9 @@ final class InterfaceLanguageSettings: ObservableObject {
     }
 
     private static let zhHans: [String: String] = [
+        "Backdrop image": "底图",
+        "Panel background": "窗口底板",
+        "This is the layer behind the text. Set it to Clear to see through to your desktop.": "这是文字后面那层底板。选「全透明」才能透出桌面内容。",
         "Download": "下载",
         "Downloading": "下载中",
         "Prompt backdrop": "提词区底板",
