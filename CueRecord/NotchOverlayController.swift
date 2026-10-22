@@ -353,7 +353,19 @@ class NotchOverlayController: NSObject {
         let fullscreenView = ExternalDisplayView(
             content: overlayContent,
             speechRecognizer: speechRecognizer,
-            mirrorAxis: nil
+            mirrorAxis: nil,
+            onExitFullscreen: { [weak self] in
+                guard let self else { return }
+                NotchSettings.shared.overlayMode = .floating
+                let text = self.overlayContent.words.joined(separator: " ")
+                self.showOverlay(
+                    text: text,
+                    hasNextPage: self.overlayContent.hasNextPage,
+                    onComplete: self.onComplete,
+                    startsSpeechRecognizer: true,
+                    isPreviewOnly: false
+                )
+            }
         )
         let contentView = NSHostingView(rootView: fullscreenView)
 
@@ -925,11 +937,11 @@ struct NotchOverlayView: View {
             switch listeningMode {
             case .classic:
                 if !isPaused {
-                    timerWordProgress += speed * 0.05
+                    if NotchSettings.shared.promptAutoScroll { timerWordProgress += speed * 0.05 }
                 }
             case .silencePaused:
                 if !isPaused && speechRecognizer.isListening && speechRecognizer.isSpeaking {
-                    timerWordProgress += speed * 0.05
+                    if NotchSettings.shared.promptAutoScroll { timerWordProgress += speed * 0.05 }
                 }
             case .wordTracking:
                 break
@@ -1427,11 +1439,11 @@ struct FloatingOverlayView: View {
             switch listeningMode {
             case .classic:
                 if !isPaused {
-                    timerWordProgress += speed * 0.05
+                    if NotchSettings.shared.promptAutoScroll { timerWordProgress += speed * 0.05 }
                 }
             case .silencePaused:
                 if !isPaused && speechRecognizer.isListening && speechRecognizer.isSpeaking {
-                    timerWordProgress += speed * 0.05
+                    if NotchSettings.shared.promptAutoScroll { timerWordProgress += speed * 0.05 }
                 }
             case .wordTracking:
                 break

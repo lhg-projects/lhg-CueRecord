@@ -47,6 +47,9 @@ final class InterfaceLanguageSettings: ObservableObject {
     }
 
     private static let zhHans: [String: String] = [
+        "Auto scroll": "自动滚动",
+        "Turn it off to scroll the prompt only by hand.": "关掉后提词器不自动滚动，只由你手动控制。",
+        "Exit Fullscreen": "退出全屏",
         "Dashed frame around the prompt": "提词区显示虚线框",
         "Blur prompt": "虚化提词区",
         "Blur the prompt and the frame so what is behind them stays readable. 0 turns it off.": "把提词文字和虚线框一起虚化，让被盖住的内容还能看清。0 表示关闭。",

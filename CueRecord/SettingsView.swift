@@ -545,6 +545,17 @@ struct SettingsView: View {
 
                 Divider()
 
+                Toggle(isOn: $settings.promptAutoScroll) {
+                    Text(t("Auto scroll"))
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+
+                Text(t("Turn it off to scroll the prompt only by hand."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
                 Toggle(isOn: $settings.showPromptFrame) {
                     Text(t("Dashed frame around the prompt"))
                         .font(.system(size: 13, weight: .medium))

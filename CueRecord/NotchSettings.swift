@@ -648,6 +648,11 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(Double(promptFontSize), forKey: "promptFontSize") }
     }
 
+    /// 提词器是否自动滚动。关掉就是「只由人控制」的手动模式。
+    var promptAutoScroll: Bool {
+        didSet { UserDefaults.standard.set(promptAutoScroll, forKey: "promptAutoScroll") }
+    }
+
     /// 提词文字区是否画虚线框（只在屏幕上显示，不进成片）。
     var showPromptFrame: Bool {
         didSet { UserDefaults.standard.set(showPromptFrame, forKey: "showPromptFrame") }
@@ -902,6 +907,7 @@ class NotchSettings {
                 : (initialFontSizePreset == .lg ? 40 : (initialFontSizePreset == .sm ? 28 : 22))
         }
         self.promptFontFamily = PrompterFontFamily(rawValue: UserDefaults.standard.string(forKey: "promptFontFamily") ?? "") ?? .system
+        self.promptAutoScroll = UserDefaults.standard.object(forKey: "promptAutoScroll") as? Bool ?? true
         self.showPromptFrame = UserDefaults.standard.object(forKey: "showPromptFrame") as? Bool ?? true
         let savedBlur = UserDefaults.standard.double(forKey: "promptBlurAmount")
         self.promptBlurAmount = savedBlur > 0 ? savedBlur : 0

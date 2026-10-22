@@ -107,6 +107,8 @@ struct ExternalDisplayView: View {
     @Bindable var content: OverlayContent
     @Bindable var speechRecognizer: SpeechRecognizer
     let mirrorAxis: MirrorAxis?
+    /// 全屏模式下切回其他模式。传 nil 表示预览，不显示按钮。
+    var onExitFullscreen: (() -> Void)? = nil
 
     private var words: [String] { content.words }
     private var totalCharCount: Int { content.totalCharCount }
@@ -207,6 +209,25 @@ struct ExternalDisplayView: View {
                     )
             }
         }
+        .overlay(alignment: .topLeading) {
+            if let onExitFullscreen {
+                Button(action: onExitFullscreen) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "arrow.down.right.and.arrow.up.left")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(uiText(InterfaceLanguageSettings.shared.text("Exit Fullscreen")))
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.45), in: Capsule())
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 18)
+                .padding(.leading, 24)
+            }
+        }
         .overlay(alignment: .topTrailing) {
             if NotchSettings.shared.showElapsedTime {
                 ElapsedTimeView(fontSize: 24)
@@ -226,10 +247,10 @@ struct ExternalDisplayView: View {
             let speed = NotchSettings.shared.scrollSpeed // words per second
             switch listeningMode {
             case .classic:
-                timerWordProgress += speed * 0.05
+                if NotchSettings.shared.promptAutoScroll { timerWordProgress += speed * 0.05 }
             case .silencePaused:
                 if speechRecognizer.isListening && speechRecognizer.isSpeaking {
-                    timerWordProgress += speed * 0.05
+                    if NotchSettings.shared.promptAutoScroll { timerWordProgress += speed * 0.05 }
                 }
             case .wordTracking:
                 break
