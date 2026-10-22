@@ -67,6 +67,19 @@ if [ "$missing" -ne 0 ]; then
   exit 1
 fi
 
+echo "🧪 Running core tests (must be all PASS)…"
+if ! "$ROOT/scripts/run-recording-core-tests.sh" > /tmp/llsstudio-core-tests.log 2>&1; then
+  echo "error: 核心测试未通过，构建中止。详见 /tmp/llsstudio-core-tests.log" >&2
+  tail -20 /tmp/llsstudio-core-tests.log >&2
+  exit 1
+fi
+if grep -q "^FAIL" /tmp/llsstudio-core-tests.log; then
+  echo "error: 核心测试有失败项，构建中止。" >&2
+  grep "^FAIL" /tmp/llsstudio-core-tests.log >&2
+  exit 1
+fi
+echo "✅ Tests passed"
+
 echo "🧹 Preparing build directory…"
 rm -rf "$DD"
 mkdir -p "$DD"

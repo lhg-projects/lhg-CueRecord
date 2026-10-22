@@ -447,7 +447,6 @@ final class InterfaceLanguageSettings: ObservableObject {
         "You're Up to Date": "已是最新版本",
         "录课台 %@ is the latest version.": "录课台 %@ 已是最新版本。",
         "Update Check Failed": "检查更新失败",
-        "Download": "下载",
         "Later": "稍后",
         "Failed to open 录课台 workspace": "无法打开 录课台 工作区",
         "Failed to save file": "保存文件失败",
