@@ -12,6 +12,7 @@ final class RecordingController: ObservableObject {
     let audioManager = AudioManager()
 
     private let screenRecorder = ScreenRecorder()
+    private let cursorTracker = CursorEventTracker()
     private let areaSelector = AreaSelector()
     private let windowSelector = WindowSelector()
     private let recordingIndicator = RecordingIndicatorWindow()
@@ -501,6 +502,7 @@ final class RecordingController: ObservableObject {
             isRecording = false
             isStopping = false
             clearUnfinishedRecording(outputURL: expectedOutputURL)
+            cursorTracker.stopSavingOutput(expectedOutputURL)
             endTranscriptCapture(outputURL: expectedOutputURL)
             presentDamageAlertIfNeeded(
                 validation: screenRecorder.lastValidation,
@@ -719,6 +721,16 @@ final class RecordingController: ObservableObject {
             startRecordingTimer()
 
             do {
+                // 光标事件轨：先起监听，成功后源画面才隐藏系统光标（导出端自绘）。
+                if let recordingFrame = resolvedRecordingTarget(
+                    mode: recordingState.recordingMode,
+                    selectedDisplayID: displayIDForRecording
+                )?.interfaceFrame {
+                    cursorTracker.start(recordingRect: recordingFrame) { [weak self] in
+                        self?.recordingState.samplingElapsed() ?? -1
+                    }
+                }
+
                 try await screenRecorder.startRecording(
                     mode: recordingState.recordingMode,
                     outputURL: recordingState.outputURL,
@@ -729,7 +741,8 @@ final class RecordingController: ObservableObject {
                     microphoneEnabled: recordingState.microphoneEnabled,
                     microphoneDeviceID: audioManager.getMicrophoneDeviceIDForSCK(),
                     microphoneAudioDeviceID: audioManager.selectedMicrophone.deviceID,
-                    displayID: displayIDForRecording
+                    displayID: displayIDForRecording,
+                    hideSystemCursor: cursorTracker.isActive
                 )
 
                 showRecordingOverlays()
@@ -738,6 +751,7 @@ final class RecordingController: ObservableObject {
                 MemoryFootprint.log("录制 开始")
                 completion?(true)
             } catch {
+                cursorTracker.stop()
                 recordingState.stopRecording()
                 isRecording = false
                 stopRecordingTimer()

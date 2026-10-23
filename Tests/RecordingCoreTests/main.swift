@@ -760,6 +760,50 @@ func testRecordingTranscriptRecorder() throws {
                "SRT 应与视频同名")
 }
 
+func testCursorEventTrackGeometryAndThrottle() throws {
+    let rect = CGRect(x: 100, y: 100, width: 800, height: 600)
+
+    let topLeft = CursorGeometry.normalizedPoint(globalX: 100, globalY: 700, in: rect)
+    try expect(topLeft != nil && abs(topLeft!.x) < 0.001 && abs(topLeft!.y) < 0.001,
+               "全局坐标画面左上角应映射为归一化 (0,0)（含 Y 翻转）")
+    let center = CursorGeometry.normalizedPoint(globalX: 500, globalY: 400, in: rect)
+    try expect(center != nil && abs(center!.x - 0.5) < 0.001 && abs(center!.y - 0.5) < 0.001,
+               "画面中心应映射为 (0.5,0.5)")
+    try expect(CursorGeometry.normalizedPoint(globalX: 5000, globalY: 400, in: rect) == nil,
+               "远超录制矩形的点应丢弃")
+
+    try expect(CursorGeometry.shouldRecordMove(lastSample: nil, t: 0, x: 0, y: 0),
+               "首个移动样本必须记录")
+    let last = CursorEventSample(t: 1.0, x: 0.1, y: 0.1)
+    try expect(!CursorGeometry.shouldRecordMove(lastSample: last, t: 1.01, x: 0.5, y: 0.5),
+               "间隔不足应跳过（暂停期间时间冻结，自然停采）")
+    try expect(!CursorGeometry.shouldRecordMove(lastSample: last, t: 1.5, x: 0.1001, y: 0.1),
+               "时间够但几乎没动应跳过")
+    try expect(CursorGeometry.shouldRecordMove(lastSample: last, t: 1.5, x: 0.2, y: 0.1),
+               "时间够且确有位移应记录")
+
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("cursor-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let outputURL = tempDir.appendingPathComponent("WindowRecord_test.mov")
+    let track = CursorEventTrack(
+        recordingRect: CursorEventRect(rect),
+        events: [CursorEventSample(t: 1, x: 0.2, y: 0.3, c: 1)]
+    )
+    CursorEventStore.save(track, for: outputURL)
+    try expect(CursorEventStore.load(from: CursorEventStore.cursorURL(for: outputURL)) == track,
+               "光标轨应可完整往返")
+    try expect(CursorEventStore.cursorURL(for: outputURL).lastPathComponent == "WindowRecord_test_cursor.json",
+               "光标侧车命名应为 <base>_cursor.json")
+
+    let emptyOutput = tempDir.appendingPathComponent("Empty.mov")
+    CursorEventStore.save(CursorEventTrack(events: []), for: emptyOutput)
+    try expect(!FileManager.default.fileExists(atPath: CursorEventStore.cursorURL(for: emptyOutput).path),
+               "没有事件时不应产生侧车文件")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -786,7 +830,8 @@ let tests: [(String, () throws -> Void)] = [
     ("RecordingPreflight", testRecordingPreflight),
     ("UnfinishedRecordingStore", testUnfinishedRecordingStore),
     ("RecordingMarkerStore", testRecordingMarkerStore),
-    ("RecordingTranscriptRecorder", testRecordingTranscriptRecorder)
+    ("RecordingTranscriptRecorder", testRecordingTranscriptRecorder),
+    ("CursorEventTrackGeometryAndThrottle", testCursorEventTrackGeometryAndThrottle)
 ]
 
 do {

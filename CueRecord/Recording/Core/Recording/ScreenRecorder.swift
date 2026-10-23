@@ -124,6 +124,9 @@ class ScreenRecorder: NSObject, ObservableObject {
     private var recordingRect: CGRect?
     private var isFullScreen: Bool = true
     private var recordingModeName: String = "fullScreen"
+    /// 录制期间由 CursorEventTracker 采集光标事件轨时，源画面不再叠加系统光标，
+    /// 导出端用自绘光标（更平滑、可放大、可加点击波纹）。
+    private var hideSystemCursor = false
     
     // 音频录制配置
     private var systemAudioEnabled: Bool = false
@@ -226,22 +229,24 @@ class ScreenRecorder: NSObject, ObservableObject {
     
     // MARK: - 录制控制
     func startRecording(
-        mode: RecordingMode, 
-        outputURL: URL, 
-        cameraOverlay: Bool = false, 
-        cameraPosition: CameraOverlayPosition = .topRight, 
+        mode: RecordingMode,
+        outputURL: URL,
+        cameraOverlay: Bool = false,
+        cameraPosition: CameraOverlayPosition = .topRight,
         cameraSize: CameraOverlaySize = .medium,
         systemAudioEnabled: Bool = false,
         microphoneEnabled: Bool = false,
         microphoneDeviceID: String? = nil,
         microphoneAudioDeviceID: AudioDeviceID? = nil,
-        displayID: CGDirectDisplayID? = nil
+        displayID: CGDirectDisplayID? = nil,
+        hideSystemCursor: Bool = false
     ) async throws {
         guard !isRecording else {
             throw RecordingError.invalidState
         }
-        
+
         print("🎬 开始屏幕录制...")
+        self.hideSystemCursor = hideSystemCursor
 
         do {
             self.outputURL = outputURL
@@ -511,7 +516,10 @@ class ScreenRecorder: NSObject, ObservableObject {
         screenCapturePixelFormat = pixelFormat
         config.pixelFormat = pixelFormat
         print("🎥 Capture pixel format: \(capturePixelFormat.displayName)")
-        config.showsCursor = true
+        config.showsCursor = !hideSystemCursor
+        if hideSystemCursor {
+            print("🖱️ 系统光标已隐藏，光标由事件轨在导出端自绘")
+        }
         config.scalesToFit = false
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(Self.screenTargetFrameRate))
         

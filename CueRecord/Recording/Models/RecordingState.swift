@@ -297,14 +297,28 @@ class RecordingState: ObservableObject {
     private var pauseBeganAt: Date?
     private(set) var isPaused = false
 
-    func updateRecordingDuration() {
-        guard let startTime = recordingStartTime else { return }
+    /// 只读计算当前成片时间（暂停段不计入），不写 recordingDuration、
+    /// 不触发 UI 刷新。光标/转写这类高频采样用它，避免 30Hz 的视图失效。
+    func currentElapsed() -> TimeInterval {
+        guard let startTime = recordingStartTime else { return 0 }
         var elapsed = Date().timeIntervalSince(startTime) - pausedAccumulated
         if let began = pauseBeganAt {
             // 暂停期间表要停住，不能继续涨
             elapsed -= Date().timeIntervalSince(began)
         }
-        recordingDuration = max(0, elapsed)
+        return max(0, elapsed)
+    }
+
+    /// 当前是否处于"不该给成片记素材"的状态（未开录或暂停中）。
+    /// 供高频采样方判断；返回负哨兵值。
+    func samplingElapsed() -> Double {
+        guard isRecording, !isPaused else { return -1 }
+        return currentElapsed()
+    }
+
+    func updateRecordingDuration() {
+        guard recordingStartTime != nil else { return }
+        recordingDuration = currentElapsed()
     }
 
     /// 暂停/继续：暂停时冻结计时，继续时把这段时长记进累计暂停时间。
