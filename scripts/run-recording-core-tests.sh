@@ -19,6 +19,7 @@ xcrun swiftc \
   "$ROOT/CueRecord/Recording/Core/Recording/RecordingMetrics.swift" \
   "$ROOT/CueRecord/Recording/Core/Recording/RecordingArtifactOrganizer.swift" \
   "$ROOT/CueRecord/Recording/Core/Recording/RecordingOutputValidator.swift" \
+  "$ROOT/CueRecord/Recording/Core/Recording/RecordingPreflight.swift" \
   "$ROOT/CueRecord/Recording/Core/Recording/RecordingEditorPresentation.swift" \
   "$ROOT/CueRecord/AI/AIModelCatalog.swift" \
   "$ROOT/CueRecord/AI/AIModelCatalogModelsDev.swift" \

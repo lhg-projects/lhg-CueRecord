@@ -644,6 +644,34 @@ func testExportCropTo16x9() throws {
                "不裁切时保持原始比例")
 }
 
+func testRecordingPreflight() throws {
+    try expect(RecordingPreflight.freeSpaceIssue(availableBytes: nil, minimumBytes: 5 << 30) == nil,
+               "读不出磁盘余量时应放行，不误伤")
+    try expect(RecordingPreflight.freeSpaceIssue(availableBytes: 1 << 30, minimumBytes: 5 << 30) != nil,
+               "余量 1GB / 门槛 5GB 应拒绝开录")
+    try expect(RecordingPreflight.freeSpaceIssue(availableBytes: 20 << 30, minimumBytes: 5 << 30) == nil,
+               "余量 20GB 应放行")
+
+    let damaged = RecordingOutputValidation(
+        health: .damaged, issues: ["Output has no video track"], fileSize: 1000, durationSeconds: 0
+    )
+    try expect(RecordingPreflight.exportBlockReason(for: damaged) != nil,
+               "屏幕轨 damaged 时必须阻止导出")
+    let healthy = RecordingOutputValidation(
+        health: .healthy, issues: [], fileSize: 1000, durationSeconds: 10
+    )
+    try expect(RecordingPreflight.exportBlockReason(for: healthy) == nil,
+               "healthy 应放行")
+    let degraded = RecordingOutputValidation(
+        health: .degraded, issues: ["Output duration is short: 0.30s"], fileSize: 1000, durationSeconds: 0.3
+    )
+    try expect(RecordingPreflight.exportBlockReason(for: degraded) == nil,
+               "degraded 但可解码时应放行")
+
+    try expect((RecordingPreflight.availableCapacity(on: URL(fileURLWithPath: NSHomeDirectory())) ?? 0) > 0,
+               "家目录应能读到正的剩余空间")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -666,7 +694,8 @@ let tests: [(String, () throws -> Void)] = [
     ("RecordingEditorPresentation", testRecordingEditorPresentation),
     ("AIVoiceCommandParsing", testAIVoiceCommandParsing),
     ("LocalizationDictionaryHasNoDuplicateKeys", testLocalizationDictionaryHasNoDuplicateKeys),
-    ("ExportCropTo16x9", testExportCropTo16x9)
+    ("ExportCropTo16x9", testExportCropTo16x9),
+    ("RecordingPreflight", testRecordingPreflight)
 ]
 
 do {

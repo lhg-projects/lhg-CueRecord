@@ -419,7 +419,33 @@ final class RecordingController: ObservableObject {
             recordingState.stopRecording()
             isRecording = false
             isStopping = false
+            presentDamageAlertIfNeeded(
+                validation: screenRecorder.lastValidation,
+                outputURL: expectedOutputURL
+            )
             runStopCompletionsIfNeeded()
+        }
+    }
+
+    /// 录制损坏时当场告知用户。此前 damaged 只写进 metrics json，
+    /// 用户直到导出看到全黑成片才知道录废了（2026-10-23 事故，HANDOVER 第 12 节）。
+    private func presentDamageAlertIfNeeded(validation: RecordingOutputValidation?, outputURL: URL?) {
+        guard let validation, validation.health == .damaged else { return }
+
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = "此条录制损坏，屏幕轨未能完整写入"
+        let issues = validation.issues.isEmpty ? "原因未知" : validation.issues.joined(separator: "；")
+        var informative = "原因：\(issues)\n导出只会得到全黑画面，请勿直接导出。"
+        if let outputURL {
+            informative += "\n文件：\(outputURL.path)"
+        }
+        informative += "\n摄像头轨与音频如果完好，仍可尝试仅导出摄像头画面。"
+        alert.informativeText = informative
+        alert.addButton(withTitle: "在 Finder 中显示")
+        alert.addButton(withTitle: "知道了")
+        if alert.runModal() == .alertFirstButtonReturn, let outputURL {
+            NSWorkspace.shared.activateFileViewerSelecting([outputURL])
         }
     }
 
@@ -455,6 +481,14 @@ final class RecordingController: ObservableObject {
         mode: RecordingRenderMode,
         exportSettings: RecordingExportSettings = .default
     ) {
+        // 导出闸门：屏幕轨损坏的 take 直接拒绝。放行的话导出会"成功"产出一个
+        // 全黑成片，比报错更误导。覆盖所有导出入口（待处理、素材库、编辑决策）。
+        let validation = RecordingOutputValidator.validate(outputURL: capturedOutput.outputURL)
+        if let blocked = RecordingPreflight.exportBlockReason(for: validation) {
+            lastError = blocked
+            return
+        }
+
         // Never drop an export request silently: keep the newest one and run it as soon as
         // the current export finishes.
         guard !isExporting else {
@@ -549,6 +583,16 @@ final class RecordingController: ObservableObject {
 
             if recordingState.cameraOverlayEnabled && !permissionsManager.cameraAuthorized {
                 recordingState.cameraOverlayEnabled = false
+            }
+
+            // 停录体检：磁盘余量不足时拒绝开录。磁盘写满是 writer 中途失败的已知成因。
+            if let spaceIssue = RecordingPreflight.freeSpaceIssue(
+                availableBytes: RecordingPreflight.availableCapacity(on: recordingState.outputDirectory)
+            ) {
+                isStarting = false
+                lastError = spaceIssue
+                completion?(false)
+                return
             }
 
             if case .selectedWindow = recordingState.recordingMode {

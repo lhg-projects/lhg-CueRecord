@@ -114,6 +114,9 @@ class ScreenRecorder: NSObject, ObservableObject {
     private let audioStartGate = AudioStartGate()
     private var pendingAudioBuffers: [PendingAudioSample] = []
     private let recordingMetrics = RecordingMetricsRecorder()
+    /// 最近一次停录的产物校验结果。停录后由 RecordingController 读取，
+    /// 用于向用户报告"此条录制损坏"，而不是等导出时才看到黑屏。
+    private(set) var lastValidation: RecordingOutputValidation?
     private var screenCapturePixelFormat: OSType = kCVPixelFormatType_32BGRA
     
     // 录制配置
@@ -1004,7 +1007,7 @@ class ScreenRecorder: NSObject, ObservableObject {
                 dropped: cameraManager.droppedFrameCount
             )
         } else {
-            print("⚠️  摄像头帧写入失败: \(cameraFrameCount)")
+            print("⚠️  摄像头帧写入失败: \(cameraFrameCount)，写入器: \(cameraWriter?.error?.localizedDescription ?? "未报错")")
         }
     }
 
@@ -2753,6 +2756,7 @@ class ScreenRecorder: NSObject, ObservableObject {
             outputURL: outputURL,
             expectedMinimumDuration: expectedMinimumDuration
         )
+        lastValidation = validation
         recordingMetrics.applyValidation(validation)
         recordingMetrics.markFinished()
         recordingMetrics.write(to: outputURL)
@@ -3010,7 +3014,7 @@ extension ScreenRecorder {
                 frameCount += 1
                 recordingMetrics.incrementScreenAppended()
             } else {
-                print("⚠️  帧写入失败，帧号: \(frameCount)")
+                print("⚠️  帧写入失败，帧号: \(frameCount)，写入器: \(videoWriter?.error?.localizedDescription ?? "未报错")")
             }
         } else {
             recordingMetrics.incrementScreenWriterNotReady()
