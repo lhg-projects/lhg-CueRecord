@@ -350,6 +350,34 @@ grep -a "📊" /tmp/mem.log
 - 可行路径：`git clone https://github.com/anthwlock/untrunc && cd untrunc && brew install nasm && make untrunc-41`（自带脚本下载 ffmpeg 4.1 源码静态编译，约 5 分钟）；
 - 用法：`./untrunc-41 <同参数健康轨> <损坏轨>`，输出 `<损坏轨>_fixed.mov`。
 
+---
+
+## 13. 2026-10-24：借鉴 Screen Studio 落地的七项能力（2.7.0）
+
+来源：`lhg-projects/lhg-screen-studio` 蒸馏包（14 项能力 + 5 张任务卡）。每项独立提交，均可 `git log` 回溯：
+
+| 提交 | 能力 | 说明 |
+|---|---|---|
+| `9aac222` | 信任四件套 | 开录磁盘体检（<5GB 拒录）、损坏即时弹窗、坏轨禁止导出、writer.error 当场入日志 |
+| `dd71558` | 崩溃恢复清单 | 开录登记 / 暂停更新 / 停录移除 / 启动提示恢复，存 `~/Library/Application Support/com.liulaoshi.llsstudio/unfinished-recordings.json` |
+| `2131db5` | 录制中打标记 | 控制条书签按钮 → `<base>_markers.json`（成片时间轴） |
+| `cfc55bc` | 转写 + SRT | 提词器识别运行时自动落盘 `<base>_transcript.json` + 同名 `.srt` |
+| `24e14f3` | 光标事件轨 | NSEvent 采样（无需辅助功能权限）→ `<base>_cursor.json`；录制时隐藏系统光标 |
+| `b03846e` | 自绘光标 | 导出渲染大号平滑箭头（约 1.4 倍）+ 点击波纹 0.45s |
+| `102dc82` | 自动缩放 | 停录按点击聚类生成 `<base>_zoom.json`，导出时 easeIn/OutCubic 缓动放大（1.9x，0.38s 进出） |
+
+核心测试从 23 项增至 **31 项**（新增：Preflight、UnfinishedStore、MarkerStore、Transcript、Cursor 轨道/节流/插值/资源、ZoomTimeline/Heuristic/Store、**CursorPixelRendering** 像素级验证真实渲染路径）。新源文件都在 `CueRecord/Recording/Core/Recording/`，加文件时记得同步 `scripts/run-recording-core-tests.sh` 的 swiftc 列表。
+
+**已知边界（下一轮可做）**：
+- 窗口录制模式下，光标归一化以开录时的窗口位置为基准，窗口移动后坐标会漂移（全屏 / 区域模式精确）。
+- 转写只在提词器语音识别运行时产生；没开提词器就没有字幕稿。
+- 自动缩放默认开启（点击即缩放），暂无设置开关；不想要某条的缩放就删它的 `_zoom.json`。
+- 手动框选缩放未做：`ZoomRange` 数据结构已支持 manual 来源，缺编辑器 UI。
+- 点击音效未做（需要导出端混音）。
+- **暂停的实机验证仍未完成**：GUI 自动化尝试失败（本应用 SwiftUI 内容不暴露 AX、窗口截图不可用），只能人工验证——双击应用，录 10s → 暂停 10s → 恢复 10s → 停止，导出成片应约 20s 且 `_cursor.json` 的时间跨度也应约 20s。
+
+**打包**：2.7.0 (build 26)。DMG 在桌面 `LLSStudio-2.7.0.dmg`；旧 2.6.5 DMG 已删除（旧版可从 `e5f42b0` 重建）。
+
 ### 排查经验（省时间用）
 
 - 设置页的**预览**和真实浮窗是**两套代码**：预览在 `SettingsView` 的 `NotchPreviewController` / `NotchPreviewContent`，浮窗在 `NotchOverlayController`。改背景类问题必须两处都看。

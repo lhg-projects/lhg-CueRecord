@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage
 import CoreMedia
 import Foundation
 
@@ -916,6 +917,71 @@ func testZoomRangeStoreRoundTrip() throws {
                "没有区间时不应产生侧车文件")
 }
 
+/// 像素级验证：自绘光标真的会画到帧上，且缩放裁切外的光标不画。
+/// 走的正是导出渲染用的 CIImage 合成路径。
+func testCursorPixelRendering() throws {
+    // 画布要够大：光标高度按内容高度的比例(5.2%)绘制，64px 画布上箭头只有 3px。
+    let size = 512
+    guard let baseContext = CGContext(
+        data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ), let baseImage = {
+        baseContext.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        baseContext.fill(CGRect(x: 0, y: 0, width: size, height: size))
+        return baseContext.makeImage()
+    }() else {
+        throw TestFailure.failed("黑底测试画面生成失败")
+    }
+
+    guard let arrow = CursorRenderer.arrowCGImage(), let ripple = CursorRenderer.rippleCGImage() else {
+        throw TestFailure.failed("箭头/波纹位图生成失败")
+    }
+
+    func brightPixelCount(of image: CIImage) -> Int {
+        let context = CIContext()
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)
+        context.render(
+            image,
+            toBitmap: &pixels,
+            rowBytes: size * 4,
+            bounds: CGRect(x: 0, y: 0, width: size, height: size),
+            format: .RGBA8,
+            colorSpace: CGColorSpaceCreateDeviceRGB()
+        )
+        var bright = 0
+        for offset in stride(from: 0, to: pixels.count, by: 4) where pixels[offset] > 200 {
+            bright += 1
+        }
+        return bright
+    }
+
+    let base = CIImage(cgImage: baseImage)
+    let cursorCI = CIImage(cgImage: arrow)
+    let rippleCI = CIImage(cgImage: ripple)
+    let contentRect = CGRect(x: 0, y: 0, width: size, height: size)
+
+    var sampler = CursorEventSampler(samples: [
+        CursorEventSample(t: 0, x: 0.5, y: 0.5),
+        CursorEventSample(t: 1, x: 0.5, y: 0.5, c: 1)
+    ])
+    let withCursor = CursorRenderer.applyCursor(
+        to: base, sampler: &sampler, at: 0.6, contentRect: contentRect,
+        cursorCI: cursorCI, rippleCI: rippleCI
+    )
+    try expect(brightPixelCount(of: withCursor) > 30,
+               "自绘箭头 + 波纹应把亮像素画上画面")
+
+    var farSampler = CursorEventSampler(samples: [CursorEventSample(t: 0, x: 0.9, y: 0.9)])
+    let croppedOut = CursorRenderer.applyCursor(
+        to: base, sampler: &farSampler, at: 0, contentRect: contentRect,
+        cursorCI: cursorCI, rippleCI: rippleCI,
+        crop: (x: 0, y: 0, w: 0.5, h: 0.5)
+    )
+    try expect(brightPixelCount(of: croppedOut) == 0,
+               "光标落在缩放裁切外时不应绘制")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -948,7 +1014,8 @@ let tests: [(String, () throws -> Void)] = [
     ("CursorRendererAssets", testCursorRendererAssets),
     ("ZoomTimelineEasingAndCrop", testZoomTimelineEasingAndCrop),
     ("ZoomHeuristicFromClicks", testZoomHeuristicFromClicks),
-    ("ZoomRangeStoreRoundTrip", testZoomRangeStoreRoundTrip)
+    ("ZoomRangeStoreRoundTrip", testZoomRangeStoreRoundTrip),
+    ("CursorPixelRendering", testCursorPixelRendering)
 ]
 
 do {
