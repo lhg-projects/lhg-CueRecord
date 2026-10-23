@@ -295,3 +295,33 @@ grep -a "📊" /tmp/mem.log
 判断方法：看 `录制 停止` 前后到 `后处理 完成` 之间的跳变。如果涨在「录制中」，是采集/编码队列积压；如果涨在「后处理」阶段，是导出链路的缓冲问题。
 
 **下一步建议**：拿到日志后，在 `ScreenRecorder.appendScreenFrame` 与 `renderEditedVideo` 两处各加一次 `MemoryFootprint.log`，把范围收敛到函数级。
+
+---
+
+## 11. 当前状态（2026-10-23 交接）
+
+### 已完成并验证
+
+| 功能 | 说明 |
+|---|---|
+| 品牌与身份 | 刘老师 · 录课台 / LLSStudio / com.liulaoshi.llsstudio，图标、文案、权限说明全部落地 |
+| 权限体系 | 代码要求固定为 bundle id（重装不丢权限）；entitlements 真正签入；摄像头首次使用主动请求 |
+| 导出 | 时钟驱动 30fps CFR（修掉屏幕静止时人像冻结）；16:9 裁切默认开启；1080p 默认 |
+| 内存 | 导出循环加 autoreleasepool，峰值稳定在 400 MB 左右，不再随片长增长 |
+| 提词器 | 字号 16–96 数值可调、六款系统字体按族名解析、虚线框、底板透明度、实时预览、手动滚动、框内滚轮接管 |
+| 颜色 | 已读/未读不做区分，代码内写死满不透明度（不再读设置） |
+| 暂停 | 控制条结束键左侧；三路丢帧 + 时间基准平移，暂停段不进成片；计时冻结 |
+| 草稿/导入 | 「打开草稿」（⇧⌘O，可选中文件夹，自动回溯 raw_data）、「导入视频」（⇧⌘I） |
+
+### 待验证 / 未解决
+
+1. **暂停是否真的剪掉那段**：需实测「录 10s → 暂停 20s → 录 10s → 导出」，成片应约 20s。若为 40s，说明只停了计时没停写入，查 `ScreenRecorder.setPaused` 与三处 `guard !isPaused`。
+2. **某条录制导出黑屏**（用户 2026-10-23 报障，未定位）。排查入口：对出问题的 `_edited.mov` 跑 `ffmpeg -vf blackdetect=d=0.3:pix_th=0.08`，判断是录制端没写帧还是合成端丢帧。
+3. **暂停期间摄像头仍在采集**（有意设计，避免恢复时曝光跳变）。若用户报告恢复瞬间跳变，改为暂停时停采集。
+
+### 排查经验（省时间用）
+
+- 设置页的**预览**和真实浮窗是**两套代码**：预览在 `SettingsView` 的 `NotchPreviewController` / `NotchPreviewContent`，浮窗在 `NotchOverlayController`。改背景类问题必须两处都看。
+- 预览里曾有**两块背景**，第二块（浮动预览）写死 `.fill(.black)` 不看设置，是「选全透明仍是黑板」的真凶。
+- 透明问题按顺序查：视图背景 → 宿主 layer（`contentsScale` / `backgroundColor`）→ 窗口 `isOpaque`/`backgroundColor` → `hasShadow` → 圆角裁剪。
+- 判断「是不是同一个应用」用 `codesign -d -r-`，看 `designated` 是 cdhash 还是 identifier。
