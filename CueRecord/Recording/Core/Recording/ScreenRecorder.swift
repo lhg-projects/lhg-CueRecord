@@ -1484,6 +1484,16 @@ class ScreenRecorder: NSObject, ObservableObject {
             : CGSize(width: outputWidth, height: outputHeight)
         let outputExtent = CGRect(origin: .zero, size: composeSize)
 
+        // 自绘光标：事件轨存在才启用（录制时源画面已隐藏系统光标）
+        let cursorTrack = CursorEventStore.load(from: CursorEventStore.cursorURL(for: screenURL))
+        var cursorSampler = CursorEventSampler(samples: cursorTrack?.events ?? [])
+        let cursorCI: CIImage? = cursorTrack == nil ? nil : CursorRenderer.arrowCGImage().map { CIImage(cgImage: $0) }
+        let rippleCI: CIImage? = cursorTrack == nil ? nil : CursorRenderer.rippleCGImage().map { CIImage(cgImage: $0) }
+        let cursorContentRect = CursorRenderer.contentRect(
+            sourceExtent: CGRect(origin: .zero, size: screenSize),
+            in: outputExtent
+        )
+
         func advanceCameraFrame(to screenTime: CMTime) {
             while let sample = nextCameraSample {
                 let sampleTime = CMSampleBufferGetPresentationTimeStamp(sample)
@@ -1521,7 +1531,7 @@ class ScreenRecorder: NSObject, ObservableObject {
                 let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
                 let seconds = max(0, CMTimeGetSeconds(screenTime))
                 let sample = Self.overlaySample(at: seconds, in: metadata.samples)
-                let composedImage = Self.composeScreenImage(
+                var composedImage = Self.composeScreenImage(
                     screenImage,
                     cameraImage: cameraImage,
                     overlaySample: sample,
@@ -1529,6 +1539,17 @@ class ScreenRecorder: NSObject, ObservableObject {
                     outputExtent: outputExtent,
                     maskCache: &maskCache
                 )
+
+                if !cursorSampler.isEmpty, let cursorCI, let rippleCI {
+                    composedImage = CursorRenderer.applyCursor(
+                        to: composedImage,
+                        sampler: &cursorSampler,
+                        at: seconds,
+                        contentRect: cursorContentRect,
+                        cursorCI: cursorCI,
+                        rippleCI: rippleCI
+                    )
+                }
 
                 let finalImage = exportSettings.cropTo16x9
                     ? Self.cropToAspect(composedImage, from: outputExtent, to: bufferExtent)
@@ -1590,6 +1611,17 @@ class ScreenRecorder: NSObject, ObservableObject {
             ? exportSettings.resolutionPreset.outputSize(for: screenSize)
             : CGSize(width: outputWidth, height: outputHeight)
         let outputExtent = CGRect(origin: .zero, size: composeSize)
+
+        // 自绘光标：事件轨存在才启用（录制时源画面已隐藏系统光标）。
+        // 时间轴与剪辑映射一致：光标 t 就是源视频时间轴。
+        let cursorTrack = CursorEventStore.load(from: CursorEventStore.cursorURL(for: screenURL))
+        var cursorSampler = CursorEventSampler(samples: cursorTrack?.events ?? [])
+        let cursorCI: CIImage? = cursorTrack == nil ? nil : CursorRenderer.arrowCGImage().map { CIImage(cgImage: $0) }
+        let rippleCI: CIImage? = cursorTrack == nil ? nil : CursorRenderer.rippleCGImage().map { CIImage(cgImage: $0) }
+        let cursorContentRect = CursorRenderer.contentRect(
+            sourceExtent: CGRect(origin: .zero, size: screenSize),
+            in: outputExtent
+        )
 
         let screenReader = try AVAssetReader(asset: screenAsset)
         let readerSettings: [String: Any] = [
@@ -1770,7 +1802,7 @@ class ScreenRecorder: NSObject, ObservableObject {
                     let screenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
                     let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
                     let overlaySample = metadata.map { Self.overlaySample(at: sourceSeconds, in: $0.samples) } ?? nil
-                    let composedImage = Self.composeEditedImage(
+                    var composedImage = Self.composeEditedImage(
                         screenImage,
                         cameraImage: cameraImage,
                         cut: resolvedCut.cut,
@@ -1778,6 +1810,18 @@ class ScreenRecorder: NSObject, ObservableObject {
                         outputExtent: outputExtent,
                         maskCache: &maskCache
                     )
+
+                    if !cursorSampler.isEmpty, let cursorCI, let rippleCI,
+                       resolvedCut.cut.layoutMode != .cameraFullScreen {
+                        composedImage = CursorRenderer.applyCursor(
+                            to: composedImage,
+                            sampler: &cursorSampler,
+                            at: sourceSeconds,
+                            contentRect: cursorContentRect,
+                            cursorCI: cursorCI,
+                            rippleCI: rippleCI
+                        )
+                    }
 
                     let finalImage = exportSettings.cropTo16x9
                         ? Self.cropToAspect(composedImage, from: outputExtent, to: bufferExtent)

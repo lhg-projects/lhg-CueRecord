@@ -804,6 +804,38 @@ func testCursorEventTrackGeometryAndThrottle() throws {
                "没有事件时不应产生侧车文件")
 }
 
+func testCursorSamplerInterpolation() throws {
+    var sampler = CursorEventSampler(samples: [
+        CursorEventSample(t: 0, x: 0.1, y: 0.1),
+        CursorEventSample(t: 1, x: 0.3, y: 0.5),
+        CursorEventSample(t: 2, x: 0.5, y: 0.5, c: 1)
+    ])
+    try expect(sampler.position(at: -1).map { abs($0.x - 0.1) < 1e-9 } == true,
+               "早于首样本应取首样本位置")
+    try expect(sampler.position(at: 0.5).map { abs($0.x - 0.2) < 1e-9 && abs($0.y - 0.3) < 1e-9 } == true,
+               "样本中点应线性插值")
+    try expect(sampler.position(at: 5).map { abs($0.x - 0.5) < 1e-9 } == true,
+               "晚于末样本应取末样本位置")
+    try expect(sampler.activeRipple(at: 2.2) != nil, "点击后 0.2s 内应有波纹")
+    try expect(sampler.activeRipple(at: 2.5) == nil, "点击后 0.5s 波纹应已结束")
+    try expect(sampler.activeRipple(at: 1.9) == nil, "点击发生前不应有波纹")
+}
+
+func testCursorRendererAssets() throws {
+    try expect(CursorRenderer.arrowCGImage() != nil, "箭头位图应可生成")
+    try expect(CursorRenderer.rippleCGImage() != nil, "波纹位图应可生成")
+
+    let rect = CursorRenderer.contentRect(
+        sourceExtent: CGRect(x: 0, y: 0, width: 2940, height: 1912),
+        in: CGRect(x: 0, y: 0, width: 1920, height: 1248)
+    )
+    try expect(abs(rect.width - 1920) < 2 && abs(rect.height - 1248) < 2,
+               "同比例画面内容矩形应铺满输出区（预设分辨率取整允许 2px 内偏差）")
+    let point = CursorRenderer.contentPoint(x: 0, y: 0, in: rect)
+    try expect(abs(point.x - rect.minX) < 0.5 && abs(point.y - rect.maxY) < 0.5,
+               "归一化 (0,0) 应映射到内容矩形左上角（CI 左下原点坐标）")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -831,7 +863,9 @@ let tests: [(String, () throws -> Void)] = [
     ("UnfinishedRecordingStore", testUnfinishedRecordingStore),
     ("RecordingMarkerStore", testRecordingMarkerStore),
     ("RecordingTranscriptRecorder", testRecordingTranscriptRecorder),
-    ("CursorEventTrackGeometryAndThrottle", testCursorEventTrackGeometryAndThrottle)
+    ("CursorEventTrackGeometryAndThrottle", testCursorEventTrackGeometryAndThrottle),
+    ("CursorSamplerInterpolation", testCursorSamplerInterpolation),
+    ("CursorRendererAssets", testCursorRendererAssets)
 ]
 
 do {
