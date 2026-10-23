@@ -672,6 +672,39 @@ func testRecordingPreflight() throws {
                "家目录应能读到正的剩余空间")
 }
 
+func testUnfinishedRecordingStore() throws {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("unfinished-store-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+    let storeURL = tempDir.appendingPathComponent("unfinished-recordings.json")
+
+    let first = UnfinishedRecordingEntry(id: "A.mov", outputURLPath: "/nonexistent/A.mov", state: "recording")
+    UnfinishedRecordingStore.upsert(first, to: storeURL)
+    try expect(UnfinishedRecordingStore.load(from: storeURL).count == 1, "开录登记后应有 1 条")
+
+    var paused = first
+    paused.state = "paused"
+    UnfinishedRecordingStore.upsert(paused, to: storeURL)
+    let reloaded = UnfinishedRecordingStore.load(from: storeURL)
+    try expect(reloaded.count == 1 && reloaded.first?.state == "paused", "upsert 应按 id 去重并更新状态")
+
+    let existingURL = tempDir.appendingPathComponent("B.mov")
+    try Data("x".utf8).write(to: existingURL)
+    UnfinishedRecordingStore.upsert(
+        UnfinishedRecordingEntry(id: "B.mov", outputURLPath: existingURL.path, state: "recording"),
+        to: storeURL
+    )
+    let gone = UnfinishedRecordingStore.entryIDsWithoutOutput(UnfinishedRecordingStore.load(from: storeURL))
+    try expect(gone == ["A.mov"], "只有文件不存在的条目才应被判为可清理")
+
+    UnfinishedRecordingStore.removeEntries(ids: gone, from: storeURL)
+    try expect(UnfinishedRecordingStore.load(from: storeURL).map(\.id) == ["B.mov"], "清理后只剩文件仍在的条目")
+
+    UnfinishedRecordingStore.remove(id: "B.mov", from: storeURL)
+    try expect(UnfinishedRecordingStore.load(from: storeURL).isEmpty, "停录后清单应清空")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -695,7 +728,8 @@ let tests: [(String, () throws -> Void)] = [
     ("AIVoiceCommandParsing", testAIVoiceCommandParsing),
     ("LocalizationDictionaryHasNoDuplicateKeys", testLocalizationDictionaryHasNoDuplicateKeys),
     ("ExportCropTo16x9", testExportCropTo16x9),
-    ("RecordingPreflight", testRecordingPreflight)
+    ("RecordingPreflight", testRecordingPreflight),
+    ("UnfinishedRecordingStore", testUnfinishedRecordingStore)
 ]
 
 do {

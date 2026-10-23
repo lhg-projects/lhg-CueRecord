@@ -105,6 +105,72 @@ final class RecordingController: ObservableObject {
         screenRecorder.setPostProcessingHandler { [weak self] event in
             self?.handleRecordingPostProcessingEvent(event)
         }
+
+        // 启动时检查上次是否异常退出、留下未收尾的录制。
+        Task { @MainActor [weak self] in
+            self?.presentUnfinishedRecordingRecoveryIfNeeded()
+        }
+    }
+
+    private var unfinishedStoreURL: URL? {
+        UnfinishedRecordingStore.defaultStoreURL()
+    }
+
+    private func registerUnfinishedRecording(state: String) {
+        guard let storeURL = unfinishedStoreURL else { return }
+        let outputURL = recordingState.outputURL
+        UnfinishedRecordingStore.upsert(
+            UnfinishedRecordingEntry(
+                id: outputURL.lastPathComponent,
+                outputURLPath: outputURL.path,
+                state: state
+            ),
+            to: storeURL
+        )
+    }
+
+    /// 用停录前捕获的 URL 清单。recordingState.stopRecording() 会清空会话状态，
+    /// 之后再读 outputURL 得到的是下一条录制的名字，会清错条目。
+    private func clearUnfinishedRecording(outputURL: URL) {
+        guard let storeURL = unfinishedStoreURL else { return }
+        UnfinishedRecordingStore.remove(id: outputURL.lastPathComponent, from: storeURL)
+    }
+
+    /// 异常退出后启动：清单里还有未收尾的录制时明确告知。
+    /// 无声处理的话，坏文件要等到用户导出看到黑屏才被发现。
+    private func presentUnfinishedRecordingRecoveryIfNeeded() {
+        guard let storeURL = unfinishedStoreURL else { return }
+        var entries = UnfinishedRecordingStore.load(from: storeURL)
+        let goneIDs = UnfinishedRecordingStore.entryIDsWithoutOutput(entries)
+        if !goneIDs.isEmpty {
+            UnfinishedRecordingStore.removeEntries(ids: goneIDs, from: storeURL)
+            entries.removeAll { goneIDs.contains($0.id) }
+        }
+        guard !entries.isEmpty else { return }
+
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        let listing = entries.prefix(3).map { entry in
+            "· \(URL(fileURLWithPath: entry.outputURLPath).lastPathComponent)（\(formatter.string(from: entry.startedAt))）"
+        }.joined(separator: "\n")
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "发现 \(entries.count) 条未完成收尾的录制"
+        alert.informativeText = """
+        上次退出时以下录制没有正常收尾，文件可能无法播放：
+        \(listing)
+        建议在 Finder 中查看并确认素材是否可用。
+        """
+        alert.addButton(withTitle: "在 Finder 中显示")
+        alert.addButton(withTitle: "知道了，清除清单")
+        if alert.runModal() == .alertFirstButtonReturn {
+            let urls = entries.map { URL(fileURLWithPath: $0.outputURLPath) }
+            NSWorkspace.shared.activateFileViewerSelecting(urls)
+        } else {
+            UnfinishedRecordingStore.removeEntries(ids: entries.map(\.id), from: storeURL)
+        }
     }
 
     func refreshDevicesAndPermissions() {
@@ -375,6 +441,7 @@ final class RecordingController: ObservableObject {
         isRecordingPaused.toggle()
         screenRecorder.setPaused(isRecordingPaused)
         recordingState.setPaused(isRecordingPaused)
+        registerUnfinishedRecording(state: isRecordingPaused ? "paused" : "recording")
     }
 
     func stopRecording(completion: (() -> Void)? = nil) {
@@ -419,6 +486,7 @@ final class RecordingController: ObservableObject {
             recordingState.stopRecording()
             isRecording = false
             isStopping = false
+            clearUnfinishedRecording(outputURL: expectedOutputURL)
             presentDamageAlertIfNeeded(
                 validation: screenRecorder.lastValidation,
                 outputURL: expectedOutputURL
@@ -620,6 +688,7 @@ final class RecordingController: ObservableObject {
                 )
 
                 showRecordingOverlays()
+                registerUnfinishedRecording(state: "recording")
                 MemoryFootprint.log("录制 开始")
                 completion?(true)
             } catch {
