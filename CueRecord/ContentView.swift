@@ -668,6 +668,172 @@ struct ContentView: View {
         return NSImage(cgImage: cgImage, size: NSSize(width: scaled.extent.width, height: scaled.extent.height))
     }
 
+    // MARK: - 导入视频
+
+    /// 把一个外部视频导入当前 Vault，生成和原生录制一样的目录结构，
+    /// 之后就能走同一条编辑导出链路。
+    private func presentImportVideoPanel() {
+        let panel = NSOpenPanel()
+        panel.title = "导入视频"
+        panel.message = "选择一个视频文件（mov / mp4），导入后可以剪辑并导出"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.movie]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        importVideo(at: url)
+    }
+
+    private func importVideo(at sourceURL: URL) {
+        guard let vaultURL = CueRecordService.shared.vaultURL else {
+            let alert = NSAlert()
+            alert.messageText = "还没有选择 Vault"
+            alert.informativeText = "请先在设置里选择一个 Vault 目录，再导入视频。"
+            alert.runModal()
+            return
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        let stamp = formatter.string(from: Date())
+
+        let sessionDir = vaultURL
+            .appendingPathComponent("导入的视频", isDirectory: true)
+            .appendingPathComponent(stamp, isDirectory: true)
+        let rawDir = sessionDir.appendingPathComponent("raw_data", isDirectory: true)
+        let destination = rawDir.appendingPathComponent("ScreenRecord_\(stamp).mov")
+
+        do {
+            try FileManager.default.createDirectory(at: rawDir, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: sourceURL, to: destination)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "导入失败"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+            return
+        }
+
+        openDraft(at: destination)
+    }
+
+    // MARK: - 打开草稿
+
+    /// 选一个已有的录制文件，直接进编辑器重新剪辑/导出。
+    /// 失败过的、之前导过的，都能这样重新加载。
+    private func presentDraftOpenPanel() {
+        let panel = NSOpenPanel()
+        panel.title = "打开草稿"
+        panel.message = "选择一个录制文件夹（或其中的视频文件），程序会自动找对原始轨"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.movie]
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        openDraft(at: url)
+    }
+
+
+
+    /// 选中的是文件夹时，找出里面的主视频：
+    /// 优先 raw_data 下的 .mov，排除 _camera / _edited；有多条时取最新的一条。
+    private static func primaryRecordingURL(in url: URL) -> URL? {
+        let fm = FileManager.default
+        var isDirectory: ObjCBool = false
+        guard fm.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return url
+        }
+
+        var candidates: [URL] = []
+        let rawData = url.appendingPathComponent("raw_data", isDirectory: true)
+        let searchRoot = fm.fileExists(atPath: rawData.path) ? rawData : url
+
+        if let items = try? fm.contentsOfDirectory(at: searchRoot,
+                                                   includingPropertiesForKeys: [.contentModificationDateKey],
+                                                   options: [.skipsHiddenFiles]) {
+            candidates = items.filter { item in
+                let name = item.lastPathComponent
+                return item.pathExtension.lowercased() == "mov"
+                    && !name.contains("_camera")
+                    && !name.contains("_edited")
+                    && !name.hasPrefix(".")
+            }
+        }
+
+        return candidates.max { lhs, rhs in
+            let l = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let r = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return l < r
+        }
+    }
+
+    /// 把「成片路径」回溯成「raw_data 里的原始主视频路径」。
+    /// 已经是原始主视频或找不到时，原样返回。
+    private static func resolveRawRecordingURL(for url: URL) -> URL? {
+        let fm = FileManager.default
+        let directory = url.deletingLastPathComponent()
+
+        // 已经在 raw_data 里，直接用
+        if directory.lastPathComponent == "raw_data" { return url }
+
+        var baseName = url.deletingPathExtension().lastPathComponent
+        for suffix in ["_edited", "_camera", "_edited_video_tmp"] where baseName.hasSuffix(suffix) {
+            baseName = String(baseName.dropLast(suffix.count))
+        }
+        let ext = url.pathExtension.isEmpty ? "mov" : url.pathExtension
+
+        // 同目录的 raw_data
+        let sameLevel = directory
+            .appendingPathComponent("raw_data", isDirectory: true)
+            .appendingPathComponent("\(baseName).\(ext)")
+        if fm.fileExists(atPath: sameLevel.path) { return sameLevel }
+
+        // 上一层的 raw_data（成片常和 raw_data 平级，兜一层）
+        let upLevel = directory.deletingLastPathComponent()
+            .appendingPathComponent("raw_data", isDirectory: true)
+            .appendingPathComponent("\(baseName).\(ext)")
+        if fm.fileExists(atPath: upLevel.path) { return upLevel }
+
+        return nil
+    }
+
+    private func openDraft(at url: URL) {
+        // 用户很可能选中的是已经合成过的成片（_edited.mov）：气泡烧在画面里，
+        // 没有独立的摄像头轨，人物/组合模式因此不可用。
+        // 这里自动回溯到同目录 raw_data 里的原始主视频，保证轨道齐全。
+        let fileURL = Self.primaryRecordingURL(in: url) ?? url
+        let resolvedURL = Self.resolveRawRecordingURL(for: fileURL) ?? fileURL
+
+        guard let captured = CapturedRecordingOutput(discovering: resolvedURL) else {
+            let alert = NSAlert()
+            alert.messageText = "无法打开这个文件"
+            alert.informativeText = "它不是一个可识别的录制文件。请选择 raw_data 目录里的主视频。"
+            alert.runModal()
+            return
+        }
+
+        recordingEditorWindow.show(
+            controller: recordingController,
+            capturedOutput: captured,
+            onDelete: { },
+            onExport: { decision, exportSettings in
+                recordingController.renderCapturedRecording(
+                    captured,
+                    editDecision: decision,
+                    exportSettings: exportSettings
+                )
+            },
+            onExportCameraOnly: { output, exportSettings in
+                recordingController.renderCapturedRecording(
+                    output,
+                    mode: .cameraOnlyTransparent,
+                    exportSettings: exportSettings
+                )
+            },
+            onClose: { }
+        )
+    }
+
     var body: some View {
         Group {
             if NotchSettings.shared.directorModeEnabled {
@@ -724,6 +890,12 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
             settingsInitialTab = .appearance
             showSettings = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openDraft)) { _ in
+            presentDraftOpenPanel()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .importVideo)) { _ in
+            presentImportVideoPanel()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openAbout)) { _ in
             showAbout = true

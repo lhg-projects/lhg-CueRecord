@@ -28,6 +28,7 @@ final class RecordingController: ObservableObject {
     @Published var isStarting = false
     @Published private(set) var isStopping = false
     @Published private(set) var isRecording = false
+    @Published private(set) var isRecordingPaused = false
     @Published private(set) var isPreviewing = false
     @Published private(set) var isExporting = false
     @Published private(set) var exportStatusText: String?
@@ -367,6 +368,15 @@ final class RecordingController: ObservableObject {
         }
     }
 
+    /// 暂停 / 继续录制。暂停期间不写入任何帧，恢复后时间轴顺延，
+    /// 中间那段不会出现在成片里。
+    func togglePauseRecording() {
+        guard isRecording else { return }
+        isRecordingPaused.toggle()
+        screenRecorder.setPaused(isRecordingPaused)
+        recordingState.setPaused(isRecordingPaused)
+    }
+
     func stopRecording(completion: (() -> Void)? = nil) {
         if let completion {
             pendingStopCompletions.append(completion)
@@ -546,6 +556,8 @@ final class RecordingController: ObservableObject {
             }
 
             recordingState.startRecording()
+            recordingState.resetPauseAccounting()
+            isRecordingPaused = false
             isRecording = true
             startRecordingTimer()
 

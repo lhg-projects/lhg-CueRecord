@@ -52,7 +52,7 @@ final class RecordingPreviewBarWindow: NSObject {
         }
 
         let visibleFrame = targetVisibleFrame(for: controller.currentRecordingInterfaceFrame)
-        let width: CGFloat = 154
+        let width: CGFloat = 206
         let height: CGFloat = 62
         let margin: CGFloat = 24
         let frame = NSRect(
@@ -583,6 +583,23 @@ private struct RecordingStopBarView: View {
                 .frame(width: 18, height: 46)
                 .padding(.leading, 7)
                 .padding(.trailing, 3)
+
+            Button {
+                controller.togglePauseRecording()
+            } label: {
+                ZStack {
+                    Image(systemName: controller.isRecordingPaused ? "play.fill" : "pause.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.orange.opacity(0.9))
+                        .clipShape(Circle())
+                }
+                .frame(width: 44, height: 46)
+            }
+            .buttonStyle(.plain)
+            .help(controller.isRecordingPaused ? t("Resume recording") : t("Pause recording"))
+            .accessibilityLabel(t("Pause recording"))
 
             Button(action: onStop) {
                 ZStack {

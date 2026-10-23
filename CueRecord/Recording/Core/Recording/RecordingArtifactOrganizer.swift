@@ -123,7 +123,7 @@ nonisolated struct RecordingExportSettings: Equatable, Sendable {
     static let `default` = RecordingExportSettings(
         resolutionPreset: .p1080,
         bitRatePreset: .medium,
-        cropTo16x9: false
+        cropTo16x9: true
     )
 
     private var resolutionPresetLongEdge: CGFloat {

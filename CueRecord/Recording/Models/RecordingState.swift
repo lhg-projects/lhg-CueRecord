@@ -293,9 +293,37 @@ class RecordingState: ObservableObject {
         print("⏹️  停止录制，时长: \(String(format: "%.1f", recordingDuration))秒")
     }
     
+    private var pausedAccumulated: TimeInterval = 0
+    private var pauseBeganAt: Date?
+    private(set) var isPaused = false
+
     func updateRecordingDuration() {
         guard let startTime = recordingStartTime else { return }
-        recordingDuration = Date().timeIntervalSince(startTime)
+        var elapsed = Date().timeIntervalSince(startTime) - pausedAccumulated
+        if let began = pauseBeganAt {
+            // 暂停期间表要停住，不能继续涨
+            elapsed -= Date().timeIntervalSince(began)
+        }
+        recordingDuration = max(0, elapsed)
+    }
+
+    /// 暂停/继续：暂停时冻结计时，继续时把这段时长记进累计暂停时间。
+    func setPaused(_ paused: Bool) {
+        if paused {
+            if pauseBeganAt == nil { pauseBeganAt = Date() }
+        } else if let began = pauseBeganAt {
+            pausedAccumulated += Date().timeIntervalSince(began)
+            pauseBeganAt = nil
+        }
+        isPaused = paused
+        updateRecordingDuration()
+    }
+
+    /// 每次开始新录制时清零暂停累计
+    func resetPauseAccounting() {
+        pauseBeganAt = nil
+        pausedAccumulated = 0
+        isPaused = false
     }
 
     private func uniqueOutputSessionDirectory() -> URL {

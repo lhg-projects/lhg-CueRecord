@@ -142,7 +142,10 @@ class NotchOverlayController: NSObject {
         }
 
         if isPreviewOnly {
+            // 预览只是「看一眼效果」，绝不能抢鼠标、也不能盖住设置窗口
             panel?.ignoresMouseEvents = true
+            panel?.level = .floating
+            panel?.hasShadow = false
         }
 
         // Show floating stop button only in follow-cursor mode (panel ignores mouse events)
@@ -1006,8 +1009,8 @@ struct NotchOverlayView: View {
                 font: NotchSettings.shared.font,
                 highlightColor: NotchSettings.shared.fontColorPreset.color,
                 cueColor: NotchSettings.shared.cueColorPreset.color,
-                cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
-                cueReadOpacity: NotchSettings.shared.cueBrightness.readOpacity,
+                cueUnreadOpacity: 1.0,
+                cueReadOpacity: 1.0,
                 onWordTap: { charOffset in
                     if listeningMode == .wordTracking {
                         speechRecognizer.jumpTo(charOffset: charOffset)
@@ -1500,8 +1503,8 @@ struct FloatingOverlayView: View {
                 font: NotchSettings.shared.font,
                 highlightColor: NotchSettings.shared.fontColorPreset.color,
                 cueColor: NotchSettings.shared.cueColorPreset.color,
-                cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
-                cueReadOpacity: NotchSettings.shared.cueBrightness.readOpacity,
+                cueUnreadOpacity: 1.0,
+                cueReadOpacity: 1.0,
                 onWordTap: { charOffset in
                     if listeningMode == .wordTracking {
                         speechRecognizer.jumpTo(charOffset: charOffset)

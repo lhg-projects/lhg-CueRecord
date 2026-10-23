@@ -275,8 +275,8 @@ struct ExternalDisplayView: View {
                     font: .systemFont(ofSize: fontSize, weight: .semibold),
                     highlightColor: NotchSettings.shared.fontColorPreset.color,
                     cueColor: NotchSettings.shared.cueColorPreset.color,
-                    cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
-                    cueReadOpacity: NotchSettings.shared.cueBrightness.readOpacity,
+                    cueUnreadOpacity: 1.0,
+                    cueReadOpacity: 1.0,
                     onWordTap: { charOffset in
                         if listeningMode == .wordTracking {
                             speechRecognizer.jumpTo(charOffset: charOffset)

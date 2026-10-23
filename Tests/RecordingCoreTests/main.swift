@@ -186,8 +186,12 @@ func testRecordingExportSettings() throws {
     try expect(defaultOutputSize == CGSize(width: 1920, height: 1080), "1080p export should cap 5K landscape sources at 1920 x 1080")
     try expect(defaultSettings.outputDimensionsText(for: fiveKSize) == "1920 x 1080", "Expected dimensions text should match the 1080p output size")
 
+    // 默认已开启 16:9 裁切，竖屏源会被裁成 1080x608；不裁切的竖屏仍保持原始比例
     let portraitOutputSize = defaultSettings.outputSize(for: CGSize(width: 2880, height: 5120))
-    try expect(portraitOutputSize == CGSize(width: 1080, height: 1920), "1080p export should preserve portrait aspect ratio")
+    try expect(portraitOutputSize == CGSize(width: 1920, height: 1080), "默认 16:9 裁切会把大尺寸竖屏源裁成 1920x1080")
+    let uncroppedPortrait = RecordingExportSettings(resolutionPreset: .p1080, bitRatePreset: .medium, cropTo16x9: false)
+    try expect(uncroppedPortrait.outputSize(for: CGSize(width: 2880, height: 5120)) == CGSize(width: 1080, height: 1920),
+               "不裁切时竖屏保持原始比例")
 
     let smallSourceSize = CGSize(width: 1280, height: 720)
     try expect(defaultSettings.outputSize(for: smallSourceSize) == smallSourceSize, "1080p export should not upscale smaller sources")

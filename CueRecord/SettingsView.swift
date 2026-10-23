@@ -22,7 +22,9 @@ class NotchPreviewController {
     func show(settings: NotchSettings) {
         // If panel already exists, just re-show it
         if let panel {
-            panel.orderFront(nil)
+            panel.ignoresMouseEvents = true
+        panel.hasShadow = false
+        panel.orderFront(nil)
             return
         }
 
@@ -158,7 +160,7 @@ struct NotchPreviewContent: View {
 
             ZStack(alignment: .top) {
                 // Shape: concave corners flatten via cornerPhase, then cross-fade to rounded via offsetPhase
-                let previewBackgroundMode = settings.overlayMode == .pinned ? settings.overlayBackgroundMode : OverlayBackgroundMode.solid
+                let previewBackgroundMode = settings.overlayBackgroundMode
                 Group {
                     if previewBackgroundMode == .blur {
                         ZStack {
@@ -185,7 +187,11 @@ struct NotchPreviewContent: View {
                 .frame(width: currentWidth, height: contentHeight)
 
                 Group {
-                    if settings.floatingGlassEffect {
+                    // 浮动预览这块此前写死黑底，完全不看「窗口底板」设置，
+                    // 导致选「全透明」预览仍是黑板。现在按设置分支。
+                    if previewBackgroundMode == .clear {
+                        Color.clear
+                    } else if settings.floatingGlassEffect || previewBackgroundMode == .blur {
                         ZStack {
                             GlassEffectView()
                             RoundedRectangle(cornerRadius: 16)

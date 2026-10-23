@@ -87,6 +87,30 @@ class ScreenRecorder: NSObject, ObservableObject {
     private var recordingStartTime: CMTime = .zero
     private var frameCount: Int64 = 0
     private var firstVideoFrameTime: CMTime?  // 记录第一帧视频的时间戳
+
+    // MARK: - 暂停/继续
+    // 思路：暂停期间丢弃所有帧；恢复时把「时间基准」forward 平移一个暂停时长。
+    // 因为所有轨道的相对时间都是 (采样时间 - firstVideoFrameTime) 算出来的，
+    // 平移基准等于把暂停那段整体剪掉，输出仍是单一连续文件，不需要拼接。
+    private(set) var isPaused = false
+    private var pauseStartedAt: Date?
+
+    func setPaused(_ paused: Bool) {
+        guard paused != isPaused else { return }
+        if paused {
+            isPaused = true
+            pauseStartedAt = Date()
+            print("⏸ 录制已暂停")
+        } else {
+            if let started = pauseStartedAt, let base = firstVideoFrameTime {
+                let seconds = Date().timeIntervalSince(started)
+                firstVideoFrameTime = CMTimeAdd(base, CMTime(seconds: seconds, preferredTimescale: 600))
+                print(String(format: "▶️ 录制继续，剪掉暂停时长 %.2fs", seconds))
+            }
+            pauseStartedAt = nil
+            isPaused = false
+        }
+    }
     private let audioStartGate = AudioStartGate()
     private var pendingAudioBuffers: [PendingAudioSample] = []
     private let recordingMetrics = RecordingMetricsRecorder()
@@ -910,6 +934,7 @@ class ScreenRecorder: NSObject, ObservableObject {
     private var recordedFrameCount = 0
 
     private func appendCameraFrame(_ frame: CameraFrameSample) {
+        guard !isPaused else { return }
         guard let videoStartTime = firstVideoFrameTime else { return }
 
         let sourceTime = frame.timestamp.isValid
@@ -1688,75 +1713,78 @@ class ScreenRecorder: NSObject, ObservableObject {
             lastWrittenSlot = max(lastWrittenSlot, slot - 1)
         }
 
-        while let screenSample = screenOutput.copyNextSampleBuffer() {
-            let screenTime = CMSampleBufferGetPresentationTimeStamp(screenSample)
-            let screenSeconds = CMTimeGetSeconds(screenTime)
+        // 关键：合成时钟由输出帧率驱动，不是由屏幕帧驱动。
+        // 屏幕录制是变帧率（画面不动就不出帧，实测空洞可达 20~40 秒），
+        // 按屏幕帧驱动的话，屏幕一静止整个人像就冻结，看起来就是卡顿。
+        // 这里每一拍分别取「最新屏幕帧」和「最新摄像头帧」，两者独立推进。
+        var currentScreenSample: CMSampleBuffer?
+        var nextScreenSample = screenOutput.copyNextSampleBuffer()
 
-            let outcome: FrameOutcome = autoreleasepool {
-                guard screenSeconds.isFinite else { return .skip }
+        func advanceScreenFrame(to time: CMTime) {
+            while let sample = nextScreenSample {
+                let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+                if pts > time, currentScreenSample != nil { break }
+                currentScreenSample = sample
+                nextScreenSample = screenOutput.copyNextSampleBuffer()
+            }
+        }
 
-                while cutIndex < resolvedCuts.count,
-                      screenSeconds >= resolvedCuts[cutIndex].endSeconds {
-                    cutIndex += 1
-                }
+        let totalOutputSeconds = resolvedCuts.reduce(0.0) { $0 + max(0, $1.endSeconds - $1.startSeconds) }
+        let totalTicks = max(0, Int((totalOutputSeconds * Double(outputTimescale)).rounded()))
+        var tick = 0
+        var activeCutIndex = 0
 
-                guard cutIndex < resolvedCuts.count else { return .stop }
+        while tick <= totalTicks {
+            let outputSeconds = Double(tick) / Double(outputTimescale)
 
-                let resolvedCut = resolvedCuts[cutIndex]
-                guard screenSeconds >= resolvedCut.startSeconds,
-                      screenSeconds <= resolvedCut.endSeconds else {
-                    return .skip
-                }
+            while activeCutIndex < resolvedCuts.count,
+                  outputSeconds >= resolvedCuts[activeCutIndex].outputStartSeconds
+                    + (resolvedCuts[activeCutIndex].endSeconds - resolvedCuts[activeCutIndex].startSeconds) {
+                activeCutIndex += 1
+            }
+            guard activeCutIndex < resolvedCuts.count else { break }
 
-                advanceCameraFrame(to: screenTime)
+            let resolvedCut = resolvedCuts[activeCutIndex]
+            let sourceSeconds = resolvedCut.startSeconds + (outputSeconds - resolvedCut.outputStartSeconds)
+            let sourceTime = CMTime(seconds: sourceSeconds, preferredTimescale: 600)
 
-                guard let screenPixelBuffer = CMSampleBufferGetImageBuffer(screenSample),
-                      let outputPixelBuffer = Self.createPixelBuffer(from: adapter) else {
-                    return .skip
-                }
+            advanceScreenFrame(to: sourceTime)
+            advanceCameraFrame(to: sourceTime)
 
-                let screenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
-                let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
-                let overlaySample = metadata.map { Self.overlaySample(at: screenSeconds, in: $0.samples) } ?? nil
-                let composedImage = Self.composeEditedImage(
-                    screenImage,
-                    cameraImage: cameraImage,
-                    cut: resolvedCut.cut,
-                    overlaySample: overlaySample,
-                    outputExtent: outputExtent,
-                    maskCache: &maskCache
-                )
+            if let screenSample = currentScreenSample,
+               let screenPixelBuffer = CMSampleBufferGetImageBuffer(screenSample),
+               let outputPixelBuffer = Self.createPixelBuffer(from: adapter) {
 
-                let finalImage = exportSettings.cropTo16x9
-                    ? Self.cropToAspect(composedImage, from: outputExtent, to: bufferExtent)
-                    : composedImage
+                autoreleasepool {
+                    let screenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
+                    let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
+                    let overlaySample = metadata.map { Self.overlaySample(at: sourceSeconds, in: $0.samples) } ?? nil
+                    let composedImage = Self.composeEditedImage(
+                        screenImage,
+                        cameraImage: cameraImage,
+                        cut: resolvedCut.cut,
+                        overlaySample: overlaySample,
+                        outputExtent: outputExtent,
+                        maskCache: &maskCache
+                    )
 
-                let outputSeconds = resolvedCut.outputStartSeconds + (screenSeconds - resolvedCut.startSeconds)
-                let slot = Int64((outputSeconds * Double(outputTimescale)).rounded(.down))
-                if slot > lastWrittenSlot {
-                    fillGap(upTo: slot, with: lastFinalImage)
+                    let finalImage = exportSettings.cropTo16x9
+                        ? Self.cropToAspect(composedImage, from: outputExtent, to: bufferExtent)
+                        : composedImage
+
                     ciContext.render(finalImage, to: outputPixelBuffer, bounds: bufferExtent, colorSpace: renderColorSpace)
                     while !writerInput.isReadyForMoreMediaData {
                         Thread.sleep(forTimeInterval: 0.002)
                     }
-                    _ = adapter.append(outputPixelBuffer, withPresentationTime: CMTime(value: slot, timescale: outputTimescale))
-                    lastWrittenSlot = slot
-                    lastFinalImage = finalImage
+                    _ = adapter.append(outputPixelBuffer, withPresentationTime: CMTime(value: Int64(tick), timescale: outputTimescale))
                     editedFrameCount += 1
+                    if editedFrameCount % 300 == 0 {
+                        MemoryFootprint.log("剪辑合成中（\(editedFrameCount) 帧）")
+                    }
                 }
-                if editedFrameCount % 300 == 0 {
-                    MemoryFootprint.log("剪辑合成中（\(editedFrameCount) 帧）")
-                }
-                return .proceed
             }
 
-            if outcome == .stop { break }
-        }
-
-        // 补齐结尾：最后一个源帧到素材结束之间的空槽也要填满，否则尾部会缺帧
-        if let lastCut = resolvedCuts.last {
-            let endSlot = Int64(((lastCut.outputStartSeconds + (lastCut.endSeconds - lastCut.startSeconds)) * Double(outputTimescale)).rounded(.down))
-            fillGap(upTo: endSlot, with: lastFinalImage)
+            tick += 1
         }
 
         writerInput.markAsFinished()
@@ -2941,6 +2969,7 @@ extension ScreenRecorder: SCStreamDelegate {
 // MARK: - 媒体处理
 extension ScreenRecorder {
     private func processVideoSampleBuffer(_ sampleBuffer: CMSampleBuffer) async {
+        guard !isPaused else { return }
         guard let writer = videoWriter,
               let writerInput = videoWriterInput,
               writer.status == .writing else {
@@ -3104,6 +3133,7 @@ extension ScreenRecorder {
     
     // MARK: - 音频处理
     private func processAudioSampleBuffer(_ sampleBuffer: CMSampleBuffer, type: AudioType) async {
+        guard !isPaused else { return }
         guard let writer = videoWriter,
               writer.status == .writing else {
             return

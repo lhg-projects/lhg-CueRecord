@@ -11,6 +11,8 @@ private let supportedCueRecordFileExtensions: Set<String> = ["md", "cuerecord", 
 extension Notification.Name {
     static let openSettings = Notification.Name("openSettings")
     static let openAbout = Notification.Name("openAbout")
+    static let openDraft = Notification.Name("openDraft")
+    static let importVideo = Notification.Name("importVideo")
     static let cameraAuthorizationGranted = Notification.Name("cameraAuthorizationGranted")
 }
 
@@ -154,6 +156,16 @@ struct CueRecordApp: App {
                     CueRecordService.shared.openFile()
                 }
                 .keyboardShortcut("o", modifiers: .command)
+
+                Button(interfaceLanguage.text("打开草稿…")) {
+                    NotificationCenter.default.post(name: .openDraft, object: nil)
+                }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+
+                Button(interfaceLanguage.text("导入视频…")) {
+                    NotificationCenter.default.post(name: .importVideo, object: nil)
+                }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .saveItem) { }
             CommandGroup(replacing: .windowArrangement) { }
