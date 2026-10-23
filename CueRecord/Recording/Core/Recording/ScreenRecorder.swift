@@ -1493,6 +1493,8 @@ class ScreenRecorder: NSObject, ObservableObject {
             sourceExtent: CGRect(origin: .zero, size: screenSize),
             in: outputExtent
         )
+        // 自动缩放：点击聚焦区间
+        let zoomRanges = ZoomRangeStore.load(from: ZoomRangeStore.zoomURL(for: screenURL))?.ranges ?? []
 
         func advanceCameraFrame(to screenTime: CMTime) {
             while let sample = nextCameraSample {
@@ -1527,9 +1529,11 @@ class ScreenRecorder: NSObject, ObservableObject {
                     return
                 }
 
-                let screenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
-                let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
+                let rawScreenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
                 let seconds = max(0, CMTimeGetSeconds(screenTime))
+                let zoomCrop = ZoomTimeline.activeCrop(at: seconds, ranges: zoomRanges)
+                let screenImage = zoomCrop.map { Self.zoomCroppedImage(rawScreenImage, crop: $0) } ?? rawScreenImage
+                let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
                 let sample = Self.overlaySample(at: seconds, in: metadata.samples)
                 var composedImage = Self.composeScreenImage(
                     screenImage,
@@ -1547,7 +1551,8 @@ class ScreenRecorder: NSObject, ObservableObject {
                         at: seconds,
                         contentRect: cursorContentRect,
                         cursorCI: cursorCI,
-                        rippleCI: rippleCI
+                        rippleCI: rippleCI,
+                        crop: zoomCrop
                     )
                 }
 
@@ -1622,6 +1627,8 @@ class ScreenRecorder: NSObject, ObservableObject {
             sourceExtent: CGRect(origin: .zero, size: screenSize),
             in: outputExtent
         )
+        // 自动缩放：点击聚焦区间（停录时由光标事件轨生成）
+        let zoomRanges = ZoomRangeStore.load(from: ZoomRangeStore.zoomURL(for: screenURL))?.ranges ?? []
 
         let screenReader = try AVAssetReader(asset: screenAsset)
         let readerSettings: [String: Any] = [
@@ -1799,7 +1806,9 @@ class ScreenRecorder: NSObject, ObservableObject {
                let outputPixelBuffer = Self.createPixelBuffer(from: adapter) {
 
                 autoreleasepool {
-                    let screenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
+                    let rawScreenImage = CIImage(cvPixelBuffer: screenPixelBuffer)
+                    let zoomCrop = ZoomTimeline.activeCrop(at: sourceSeconds, ranges: zoomRanges)
+                    let screenImage = zoomCrop.map { Self.zoomCroppedImage(rawScreenImage, crop: $0) } ?? rawScreenImage
                     let cameraImage = currentCameraPixelBuffer.map { CIImage(cvPixelBuffer: $0) }
                     let overlaySample = metadata.map { Self.overlaySample(at: sourceSeconds, in: $0.samples) } ?? nil
                     var composedImage = Self.composeEditedImage(
@@ -1819,7 +1828,8 @@ class ScreenRecorder: NSObject, ObservableObject {
                             at: sourceSeconds,
                             contentRect: cursorContentRect,
                             cursorCI: cursorCI,
-                            rippleCI: rippleCI
+                            rippleCI: rippleCI,
+                            crop: zoomCrop
                         )
                     }
 
@@ -2171,6 +2181,19 @@ class ScreenRecorder: NSObject, ObservableObject {
         return image
             .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
             .transformed(by: CGAffineTransform(translationX: translationX, y: translationY))
+    }
+
+    /// 按归一化裁切矩形（左上原点）裁出缩放区间聚焦的画面。
+    /// CIImage 是左下原点，y 轴在这里翻转。
+    private nonisolated static func zoomCroppedImage(_ image: CIImage, crop: NormalizedCrop) -> CIImage {
+        let extent = image.extent
+        let rect = CGRect(
+            x: extent.minX + crop.x * extent.width,
+            y: extent.minY + (1 - crop.y - crop.h) * extent.height,
+            width: crop.w * extent.width,
+            height: crop.h * extent.height
+        )
+        return image.cropped(to: rect)
     }
 
     /// 把合成好的整幅画面按目标比例居中裁切，再缩放到目标尺寸。

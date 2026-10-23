@@ -154,39 +154,50 @@ nonisolated enum CursorRenderer {
     }
 
     /// 把光标（和进行中的点击波纹）合成到帧上。光标画在相机画中画之上。
+    /// crop 非空时表示当前处于缩放区间内，光标/波纹坐标先透过裁切矩形映射，
+    /// 落在放大区外的箭头不画。
     static func applyCursor(
         to image: CIImage,
         sampler: inout CursorEventSampler,
         at t: Double,
         contentRect: CGRect,
         cursorCI: CIImage,
-        rippleCI: CIImage
+        rippleCI: CIImage,
+        crop: NormalizedCrop? = nil
     ) -> CIImage {
         guard let point = sampler.position(at: t) else { return image }
+        let mappedPoint: (x: Double, y: Double)? = crop.map {
+            ZoomTimeline.mapPointThroughCrop(x: point.x, y: point.y, crop: $0)
+        } ?? point
 
-        // 波纹画在光标下面
         var result = image
         if let click = sampler.activeRipple(at: t) {
-            let progress = (t - click.t) / rippleDuration
-            let clickPoint = contentPoint(x: click.x, y: click.y, in: contentRect)
-            let ringSize = contentRect.height * (0.056 + progress * 0.11) * 1.12
-            let scaledRipple = rippleCI
-                .transformed(by: CGAffineTransform(
-                    scaleX: ringSize / rippleCI.extent.width,
-                    y: ringSize / rippleCI.extent.height
-                ))
-                .transformed(by: CGAffineTransform(
-                    translationX: clickPoint.x - ringSize / 2,
-                    y: clickPoint.y - ringSize / 2
-                ))
-                .applyingFilter("CIColorMatrix", parameters: [
-                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: CGFloat(0.95 * (1 - progress)))
-                ])
-            result = scaledRipple.composited(over: result)
+            let mappedClick: (x: Double, y: Double)? = crop.map {
+                ZoomTimeline.mapPointThroughCrop(x: click.x, y: click.y, crop: $0)
+            } ?? (click.x, click.y)
+            if let mappedClick {
+                let progress = (t - click.t) / rippleDuration
+                let clickPoint = contentPoint(x: mappedClick.x, y: mappedClick.y, in: contentRect)
+                let ringSize = contentRect.height * (0.056 + progress * 0.11) * 1.12
+                let scaledRipple = rippleCI
+                    .transformed(by: CGAffineTransform(
+                        scaleX: ringSize / rippleCI.extent.width,
+                        y: ringSize / rippleCI.extent.height
+                    ))
+                    .transformed(by: CGAffineTransform(
+                        translationX: clickPoint.x - ringSize / 2,
+                        y: clickPoint.y - ringSize / 2
+                    ))
+                    .applyingFilter("CIColorMatrix", parameters: [
+                        "inputAVector": CIVector(x: 0, y: 0, z: 0, w: CGFloat(0.95 * (1 - progress)))
+                    ])
+                result = scaledRipple.composited(over: result)
+            }
         }
 
+        guard let mappedPoint else { return result }
         // 箭头热点在左上角
-        let cursorPoint = contentPoint(x: point.x, y: point.y, in: contentRect)
+        let cursorPoint = contentPoint(x: mappedPoint.x, y: mappedPoint.y, in: contentRect)
         let cursorHeight = contentRect.height * relativeCursorHeight
         let cursorWidth = cursorHeight * (cursorCI.extent.width / max(cursorCI.extent.height, 1))
         let scaledCursor = cursorCI

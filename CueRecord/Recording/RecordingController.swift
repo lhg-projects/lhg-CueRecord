@@ -503,6 +503,7 @@ final class RecordingController: ObservableObject {
             isStopping = false
             clearUnfinishedRecording(outputURL: expectedOutputURL)
             cursorTracker.stopSavingOutput(expectedOutputURL)
+            generateAutoZoomRanges(outputURL: expectedOutputURL)
             endTranscriptCapture(outputURL: expectedOutputURL)
             presentDamageAlertIfNeeded(
                 validation: screenRecorder.lastValidation,
@@ -633,6 +634,16 @@ final class RecordingController: ObservableObject {
 
     /// 挂载转写钩子：提词器识别开着时，把讲的话连同成片时间点记进字幕稿。
     /// 暂停期间音频不进成片，暂停时的语音不记录，避免字幕与成片错位。
+    /// 停录后依据光标事件轨生成自动缩放区间（点击 = 注意力焦点）。
+    /// 导出时 ZoomTimeline 按 <base>_zoom.json 做缓动放大。
+    private func generateAutoZoomRanges(outputURL: URL) {
+        guard let cursorTrack = CursorEventStore.load(from: CursorEventStore.cursorURL(for: outputURL)) else { return }
+        let ranges = ZoomHeuristic.ranges(from: cursorTrack.events)
+        guard !ranges.isEmpty else { return }
+        ZoomRangeStore.save(ZoomRangeFile(source: "auto-clicks", ranges: ranges), for: outputURL)
+        print("🔍 自动缩放区间: \(ranges.count) 个 → \(outputURL.deletingPathExtension().lastPathComponent)_zoom.json")
+    }
+
     private func beginTranscriptCapture() {
         transcriptAccumulator = RecordingTranscriptAccumulator()
         let recognizer = CueRecordService.shared.overlayController.speechRecognizer

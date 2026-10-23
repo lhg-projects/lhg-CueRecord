@@ -25,6 +25,7 @@ xcrun swiftc \
   "$ROOT/CueRecord/Recording/Core/Recording/RecordingTranscriptRecorder.swift" \
   "$ROOT/CueRecord/Recording/Core/Recording/CursorEventTracker.swift" \
   "$ROOT/CueRecord/Recording/Core/Recording/CursorRenderer.swift" \
+  "$ROOT/CueRecord/Recording/Core/Recording/ZoomRange.swift" \
   "$ROOT/CueRecord/Recording/Core/Recording/RecordingEditorPresentation.swift" \
   "$ROOT/CueRecord/AI/AIModelCatalog.swift" \
   "$ROOT/CueRecord/AI/AIModelCatalogModelsDev.swift" \

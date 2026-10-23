@@ -836,6 +836,86 @@ func testCursorRendererAssets() throws {
                "归一化 (0,0) 应映射到内容矩形左上角（CI 左下原点坐标）")
 }
 
+func testZoomTimelineEasingAndCrop() throws {
+    let range = ZoomRange(startSeconds: 2, endSeconds: 6, centerX: 0.5, centerY: 0.5, zoomScale: 2.0, easingSeconds: 0.4)
+    try expect(ZoomTimeline.zoomFactor(at: 1.9, range: range) == 1, "区间开始前不缩放")
+    try expect(ZoomTimeline.zoomFactor(at: 4.0, range: range) == 2, "区间平台期应为满倍率")
+    try expect(ZoomTimeline.zoomFactor(at: 6.1, range: range) == 1, "区间结束后不缩放")
+    try expect(ZoomTimeline.zoomFactor(at: 2.2, range: range) > 1
+        && ZoomTimeline.zoomFactor(at: 2.2, range: range) < 2, "进入缓动期倍率应在 1 与满倍率之间")
+    try expect(ZoomTimeline.zoomFactor(at: 5.8, range: range) > 1
+        && ZoomTimeline.zoomFactor(at: 5.8, range: range) < 2, "退出缓动期倍率应在 1 与满倍率之间")
+
+    try expect(ZoomTimeline.activeCrop(at: 4, ranges: [range]) != nil, "区间内应有裁切")
+    try expect(ZoomTimeline.activeCrop(at: 1, ranges: [range]) == nil, "区间外应无裁切")
+
+    let corner = ZoomRange(startSeconds: 0, endSeconds: 5, centerX: 0.02, centerY: 0.02, zoomScale: 2.0, easingSeconds: 0.3)
+    guard let crop = ZoomTimeline.activeCrop(at: 2.5, ranges: [corner]) else {
+        throw TestFailure.failed("角落聚焦应产生裁切")
+    }
+    try expect(crop.x >= -1e-9 && crop.y >= -1e-9
+        && crop.x + crop.w <= 1 + 1e-9 && crop.y + crop.h <= 1 + 1e-9,
+               "角落聚焦的裁切矩形必须被钳制在画面内")
+    try expect(abs(crop.x) < 1e-9 && abs(crop.y) < 1e-9, "左上角聚焦应贴住左上角")
+
+    let half: NormalizedCrop = (x: 0.25, y: 0.25, w: 0.5, h: 0.5)
+    let inside = ZoomTimeline.mapPointThroughCrop(x: 0.5, y: 0.5, crop: half)
+    try expect(inside != nil && abs(inside!.x - 0.5) < 1e-9 && abs(inside!.y - 0.5) < 1e-9,
+               "裁切中心点映射后应仍在中心")
+    try expect(ZoomTimeline.mapPointThroughCrop(x: 0.1, y: 0.5, crop: half) == nil,
+               "裁切外远处的点应判为不可见")
+}
+
+func testZoomHeuristicFromClicks() throws {
+    try expect(ZoomHeuristic.ranges(from: [CursorEventSample(t: 1, x: 0.5, y: 0.5)]).isEmpty,
+               "没有点击不应生成区间")
+
+    let single = ZoomHeuristic.ranges(from: [
+        CursorEventSample(t: 1.0, x: 0.3, y: 0.3),
+        CursorEventSample(t: 2.0, x: 0.3, y: 0.3, c: 1),
+        CursorEventSample(t: 3.0, x: 0.3, y: 0.3)
+    ])
+    try expect(single.count == 1, "单次点击应生成一个区间")
+    if let r = single.first {
+        try expect(abs(r.startSeconds - 1.55) < 1e-9, "区间应在点击前 0.45s 开始（先导）")
+        try expect(abs(r.endSeconds - 3.7) < 1e-9, "区间应在点击后 1.7s 结束（保持）")
+        try expect(abs(r.centerX - 0.3) < 1e-9, "聚焦中心应为点击位置")
+    }
+
+    let burst = ZoomHeuristic.ranges(from: [
+        CursorEventSample(t: 1.0, x: 0.4, y: 0.4, c: 1),
+        CursorEventSample(t: 1.3, x: 0.41, y: 0.4, c: 1),
+        CursorEventSample(t: 1.6, x: 0.4, y: 0.41, c: 1)
+    ])
+    try expect(burst.count == 1, "近距离连点应合并为一个区间")
+
+    let two = ZoomHeuristic.ranges(from: [
+        CursorEventSample(t: 1.0, x: 0.2, y: 0.2, c: 1),
+        CursorEventSample(t: 10.0, x: 0.8, y: 0.8, c: 1)
+    ])
+    try expect(two.count == 2, "远距离两次点击应各自成区间")
+}
+
+func testZoomRangeStoreRoundTrip() throws {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("zoom-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let outputURL = tempDir.appendingPathComponent("ScreenRecord_z.mov")
+    let file = ZoomRangeFile(ranges: [ZoomRange(startSeconds: 0, endSeconds: 3, centerX: 0.5, centerY: 0.5)])
+    ZoomRangeStore.save(file, for: outputURL)
+    try expect(ZoomRangeStore.load(from: ZoomRangeStore.zoomURL(for: outputURL)) == file,
+               "缩放区间应可完整往返")
+    try expect(ZoomRangeStore.zoomURL(for: outputURL).lastPathComponent == "ScreenRecord_z_zoom.json",
+               "缩放侧车命名应为 <base>_zoom.json")
+
+    let emptyOutput = tempDir.appendingPathComponent("EmptyZoom.mov")
+    ZoomRangeStore.save(ZoomRangeFile(ranges: []), for: emptyOutput)
+    try expect(!FileManager.default.fileExists(atPath: ZoomRangeStore.zoomURL(for: emptyOutput).path),
+               "没有区间时不应产生侧车文件")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -865,7 +945,10 @@ let tests: [(String, () throws -> Void)] = [
     ("RecordingTranscriptRecorder", testRecordingTranscriptRecorder),
     ("CursorEventTrackGeometryAndThrottle", testCursorEventTrackGeometryAndThrottle),
     ("CursorSamplerInterpolation", testCursorSamplerInterpolation),
-    ("CursorRendererAssets", testCursorRendererAssets)
+    ("CursorRendererAssets", testCursorRendererAssets),
+    ("ZoomTimelineEasingAndCrop", testZoomTimelineEasingAndCrop),
+    ("ZoomHeuristicFromClicks", testZoomHeuristicFromClicks),
+    ("ZoomRangeStoreRoundTrip", testZoomRangeStoreRoundTrip)
 ]
 
 do {
