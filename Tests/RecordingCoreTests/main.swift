@@ -725,6 +725,41 @@ func testRecordingMarkerStore() throws {
                "标记时间点应原样保留")
 }
 
+func testRecordingTranscriptRecorder() throws {
+    var accumulator = RecordingTranscriptAccumulator()
+
+    // 分段一：文本在段内演化，endpoint 定稿
+    accumulator.ingestUpdate("打开", at: 1.0)
+    accumulator.ingestUpdate("打开浏览器", at: 2.5)
+    accumulator.closeSegment(at: 3.2)
+    // 分段二：停录时未触发 endpoint，也应定稿保留
+    accumulator.ingestUpdate("点击下载", at: 5.0)
+    accumulator.ingestUpdate("点击下载按钮", at: 6.4)
+    accumulator.closeSegment(at: 6.4)
+
+    try expect(accumulator.segments.count == 2, "应得到两个分段")
+    try expect(abs(accumulator.segments[0].start - 1.0) < 0.001
+        && abs(accumulator.segments[0].end - 3.2) < 0.001, "首段时间点应取首见/定稿时刻")
+    try expect(accumulator.segments[0].text == "打开浏览器", "文本取演化后的最终值")
+    try expect(abs(accumulator.segments[1].end - 6.4) < 0.001, "未触发 endpoint 的段在停录时定稿")
+
+    // 空段不应产生记录
+    accumulator.closeSegment(at: 7.0)
+    try expect(accumulator.segments.count == 2, "空文本分段不应落盘")
+
+    let srt = TranscriptSRTSerializer.srtText(from: accumulator.segments)
+    try expect(srt.contains("1\n00:00:01,000 --> 00:00:03,200\n打开浏览器"), "SRT 首块应格式正确")
+    try expect(srt.contains("2\n00:00:05,000 --> 00:00:06,400\n点击下载按钮"), "SRT 次块应格式正确")
+    try expect(TranscriptSRTSerializer.srtText(from: []) == "", "空分段不应输出 SRT")
+    try expect(TranscriptSRTSerializer.timestamp(3661.5) == "01:01:01,500", "小时位应正确进位")
+
+    let outputURL = URL(fileURLWithPath: "/tmp/ScreenRecord_x.mov")
+    try expect(TranscriptSRTSerializer.transcriptURL(for: outputURL).lastPathComponent == "ScreenRecord_x_transcript.json",
+               "转写侧车命名应为 <base>_transcript.json")
+    try expect(TranscriptSRTSerializer.srtURL(for: outputURL).lastPathComponent == "ScreenRecord_x.srt",
+               "SRT 应与视频同名")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -750,7 +785,8 @@ let tests: [(String, () throws -> Void)] = [
     ("ExportCropTo16x9", testExportCropTo16x9),
     ("RecordingPreflight", testRecordingPreflight),
     ("UnfinishedRecordingStore", testUnfinishedRecordingStore),
-    ("RecordingMarkerStore", testRecordingMarkerStore)
+    ("RecordingMarkerStore", testRecordingMarkerStore),
+    ("RecordingTranscriptRecorder", testRecordingTranscriptRecorder)
 ]
 
 do {

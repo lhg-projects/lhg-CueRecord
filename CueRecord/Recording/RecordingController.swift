@@ -44,6 +44,7 @@ final class RecordingController: ObservableObject {
     }
 
     private var queuedRenderRequest: QueuedRenderRequest?
+    private var transcriptAccumulator: RecordingTranscriptAccumulator?
 
     var cameraManager: CameraManager {
         screenRecorder.getCameraManager()
@@ -500,6 +501,7 @@ final class RecordingController: ObservableObject {
             isRecording = false
             isStopping = false
             clearUnfinishedRecording(outputURL: expectedOutputURL)
+            endTranscriptCapture(outputURL: expectedOutputURL)
             presentDamageAlertIfNeeded(
                 validation: screenRecorder.lastValidation,
                 outputURL: expectedOutputURL
@@ -627,6 +629,36 @@ final class RecordingController: ObservableObject {
         }
     }
 
+    /// 挂载转写钩子：提词器识别开着时，把讲的话连同成片时间点记进字幕稿。
+    /// 暂停期间音频不进成片，暂停时的语音不记录，避免字幕与成片错位。
+    private func beginTranscriptCapture() {
+        transcriptAccumulator = RecordingTranscriptAccumulator()
+        let recognizer = CueRecordService.shared.overlayController.speechRecognizer
+        recognizer.onTranscriptUpdate = { [weak self] text in
+            guard let self, self.isRecording, !self.isRecordingPaused else { return }
+            self.recordingState.updateRecordingDuration()
+            self.transcriptAccumulator?.ingestUpdate(text, at: self.recordingState.recordingDuration)
+        }
+        recognizer.onTranscriptSegmentEnd = { [weak self] in
+            guard let self, self.isRecording else { return }
+            self.recordingState.updateRecordingDuration()
+            self.transcriptAccumulator?.closeSegment(at: self.recordingState.recordingDuration)
+        }
+    }
+
+    private func endTranscriptCapture(outputURL: URL) {
+        let recognizer = CueRecordService.shared.overlayController.speechRecognizer
+        recognizer.onTranscriptUpdate = nil
+        recognizer.onTranscriptSegmentEnd = nil
+        guard var accumulator = transcriptAccumulator else { return }
+        transcriptAccumulator = nil
+        recordingState.updateRecordingDuration()
+        accumulator.closeSegment(at: recordingState.recordingDuration)
+        guard !accumulator.segments.isEmpty else { return }
+        TranscriptSRTSerializer.saveTranscript(accumulator.segments, for: outputURL)
+        print("📝 字幕稿已保存: \(accumulator.segments.count) 段 → \(outputURL.deletingPathExtension().lastPathComponent).srt")
+    }
+
     private func startRecording(
         displayID requestedDisplayID: CGDirectDisplayID? = nil,
         completion: ((Bool) -> Void)? = nil
@@ -702,6 +734,7 @@ final class RecordingController: ObservableObject {
 
                 showRecordingOverlays()
                 registerUnfinishedRecording(state: "recording")
+                beginTranscriptCapture()
                 MemoryFootprint.log("录制 开始")
                 completion?(true)
             } catch {

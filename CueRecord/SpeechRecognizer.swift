@@ -90,6 +90,12 @@ class SpeechRecognizer {
     var shouldDismiss: Bool = false
     var shouldAdvancePage: Bool = false
 
+    /// 转写落盘钩子：录制期间由 RecordingController 挂载，
+    /// 把讲的话连同成片时间点写进 <输出>_transcript.json / .srt。
+    /// 不挂载时零开销，不影响提词器跟踪与语音口令。
+    var onTranscriptUpdate: ((String) -> Void)?
+    var onTranscriptSegmentEnd: (() -> Void)?
+
     /// True when recent audio levels indicate the user is actively speaking
     var isSpeaking: Bool {
         let recent = audioLevels.suffix(10)
@@ -256,11 +262,13 @@ class SpeechRecognizer {
             guard let self, self.sessionGeneration == currentGeneration else { return }
             self.lastSpokenText = spoken
             self.matchCharacters(spoken: spoken)
+            self.onTranscriptUpdate?(spoken)
         }
         asr.onNewSegment = { [weak self] in
             guard let self, self.sessionGeneration == currentGeneration else { return }
             self.matchStartOffset = self.recognizedCharCount
             self.recentMatchPositions = []
+            self.onTranscriptSegmentEnd?()
         }
         asr.onLevelUpdate = { [weak self] level in
             self?.audioLevels.append(level)
