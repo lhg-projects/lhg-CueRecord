@@ -315,9 +315,40 @@ grep -a "📊" /tmp/mem.log
 
 ### 待验证 / 未解决
 
-1. **暂停是否真的剪掉那段**：需实测「录 10s → 暂停 20s → 录 10s → 导出」，成片应约 20s。若为 40s，说明只停了计时没停写入，查 `ScreenRecorder.setPaused` 与三处 `guard !isPaused`。
-2. **某条录制导出黑屏**（用户 2026-10-23 报障，未定位）。排查入口：对出问题的 `_edited.mov` 跑 `ffmpeg -vf blackdetect=d=0.3:pix_th=0.08`，判断是录制端没写帧还是合成端丢帧。
+1. **暂停是否真的剪掉那段**：需实测「录 10s → 暂停 20s → 录 10s → 导出」，成片应约 20s。若为 40s，说明只停了计时没停写入，查 `ScreenRecorder.setPaused` 与三处 `guard !isPaused`。（2026-10-23 深夜静态复核：三路丢帧齐全、基准平移数学自洽、帧处理与 `setPaused` 都串行在 MainActor，时序安全；但实机测试仍必须做。）
+2. **某条录制导出黑屏**：**已定位，见第 12 节**。不是合成端丢帧；是那条录制的屏幕轨 AVAssetWriter 中途失败（moov 未写入，文件不可解码），导出时读不出画面所以全黑。
 3. **暂停期间摄像头仍在采集**（有意设计，避免恢复时曝光跳变）。若用户报告恢复瞬间跳变，改为暂停时停采集。
+
+---
+
+## 12. 黑屏视频：已定位（2026-10-23 深夜，接手 Agent 复盘）
+
+**结论**：用户看到的黑屏成片，源头是 2026-10-23 15:20 那条录制**屏幕轨文件损坏**，与导出/合成代码无关。
+
+| 项 | 值 |
+|---|---|
+| 损坏文件 | `~/Documents/Obsidian Vault/Imported Markdown/Imported Markdown - 收件箱总览/ScreenRecord_2026-10-23_15-20-25.mov`（87 MB） |
+| 症状 | `ffprobe` 报 `moov atom not found`，完全不可解码 |
+| 应用自证 | 同目录 `_metrics.json`：`health: "damaged"`、`Output has no video track`、`screenFramesAppended: 1860` |
+| 同场摄像头轨 | 正常可播，36.35s（说明采集与摄像头 writer 都活着，只有屏幕 writer 失败） |
+| 其余全部录制 | `blackdetect` 扫描零黑帧段，全部健康 |
+
+**故障链**：屏幕轨 `AVAssetWriter` 录制中途进入 `.failed` → `finishWriting` 不写 moov → `finishVideoWriting` 只 `print` 一行错误后返回 nil（`ScreenRecorder.swift` 约 2690–2740 行）→ 校验器把 damaged 写进 metrics，**但没有任何 UI 代码读 health**，用户不知情 → 事后在编辑器里导出，屏幕轨读不出 → 成片全黑。
+
+**未决**：writer 为什么进 `.failed`。当日 15:20 跑的是白天未提交的中间构建，writer.error 只打进了已丢失的 stdout。该条录制帧数据显示中间约 9.6 秒摄像头连续丢帧（46s 墙钟 − 36.35s 成轨），形态像一次暂停，而暂停功能当晚才提交——**暂停是首要嫌疑但无实证**（当前已提交代码里暂停时序经复核是安全的，见第 11 节）。
+
+**修复清单**（按优先级）：
+1. 停录后若 `health != healthy`，立即弹窗告知「此条录制损坏：<原因>」，不要静默；
+2. 编辑器对屏幕轨不可解码的 take 禁止导出并标注，而不是渲染出黑片；
+3. `writerInput.append` 失败当场打印 `writer.error`（现在只在 finish 时打，日志早已冲掉）；
+4. 实机复现：带 stdout 日志录一条「10s 录 → 暂停 10s → 恢复 10s → 停止」，grep `视频文件保存失败` / `帧写入失败`，一次测试同时验证第 11 节第 1、2 两项。
+
+**素材已抢救（2026-10-23 深夜）**：用 untrunc 从 mdat 找回 1856/1860 个视频包，产出 `ScreenRecord_2026-10-23_15-20-25.mov_fixed.mov`（与原文件同目录，87 MB，H.264 2940×1912）。`blackdetect` 零黑段，抽帧目检画面完好。注意：fixed 文件的容器时长 66s 由音轨主导，视频包实际跨度约 38s，若音画有偏移需在导出时重对齐。
+
+修复工具备忘（`/tmp` 重启即失）：
+- 第三方 tap `sidneys/homebrew/untrunc` 公式已失效（SHA256 不符），且本机 Homebrew freetype 链接了不存在的 `libhvf.dylib`，走动态库必挂；
+- 可行路径：`git clone https://github.com/anthwlock/untrunc && cd untrunc && brew install nasm && make untrunc-41`（自带脚本下载 ffmpeg 4.1 源码静态编译，约 5 分钟）；
+- 用法：`./untrunc-41 <同参数健康轨> <损坏轨>`，输出 `<损坏轨>_fixed.mov`。
 
 ### 排查经验（省时间用）
 
