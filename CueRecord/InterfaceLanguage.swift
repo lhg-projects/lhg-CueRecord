@@ -49,6 +49,8 @@ final class InterfaceLanguageSettings: ObservableObject {
     private static let zhHans: [String: String] = [
         "Pause recording": "暂停录制",
         "Resume recording": "继续录制",
+        "Add marker": "打标记",
+        "Marked %@": "已标记 %@",
         "Backdrop image": "底图",
         "Panel background": "窗口底板",
         "This is the layer behind the text. Set it to Clear to see through to your desktop.": "这是文字后面那层底板。选「全透明」才能透出桌面内容。",

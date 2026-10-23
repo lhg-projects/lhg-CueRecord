@@ -705,6 +705,26 @@ func testUnfinishedRecordingStore() throws {
     try expect(UnfinishedRecordingStore.load(from: storeURL).isEmpty, "停录后清单应清空")
 }
 
+func testRecordingMarkerStore() throws {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("markers-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let outputURL = tempDir.appendingPathComponent("ScreenRecord_test.mov")
+    let storeURL = RecordingMarkerStore.markersURL(for: outputURL)
+    try expect(storeURL.lastPathComponent == "ScreenRecord_test_markers.json",
+               "标记侧车应命名为 <base>_markers.json")
+
+    RecordingMarkerStore.append(elapsedSeconds: 3.5, to: storeURL)
+    RecordingMarkerStore.append(elapsedSeconds: 9.0, to: storeURL)
+    let loaded = RecordingMarkerStore.load(from: storeURL)
+    try expect(loaded.count == 2 && loaded[0].index == 0 && loaded[1].index == 1,
+               "追加两条后应按序号加载")
+    try expect(abs(loaded[1].elapsedSeconds - 9.0) < 0.001,
+               "标记时间点应原样保留")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -729,7 +749,8 @@ let tests: [(String, () throws -> Void)] = [
     ("LocalizationDictionaryHasNoDuplicateKeys", testLocalizationDictionaryHasNoDuplicateKeys),
     ("ExportCropTo16x9", testExportCropTo16x9),
     ("RecordingPreflight", testRecordingPreflight),
-    ("UnfinishedRecordingStore", testUnfinishedRecordingStore)
+    ("UnfinishedRecordingStore", testUnfinishedRecordingStore),
+    ("RecordingMarkerStore", testRecordingMarkerStore)
 ]
 
 do {

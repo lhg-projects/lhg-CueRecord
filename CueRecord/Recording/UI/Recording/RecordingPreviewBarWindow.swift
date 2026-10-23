@@ -563,6 +563,7 @@ private struct RecordingStopBarView: View {
     @ObservedObject private var controller: RecordingController
     @ObservedObject private var recordingState: RecordingState
     let onStop: () -> Void
+    @State private var markerFeedback: String?
 
     init(
         controller: RecordingController,
@@ -583,6 +584,36 @@ private struct RecordingStopBarView: View {
                 .frame(width: 18, height: 46)
                 .padding(.leading, 7)
                 .padding(.trailing, 3)
+
+            Button {
+                if let marker = controller.addMarkerAtCurrentTime() {
+                    markerFeedback = String(format: "%.1fs", marker.elapsedSeconds)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                        markerFeedback = nil
+                    }
+                }
+            } label: {
+                ZStack {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 40, height: 40)
+                        .background(Color.primary.opacity(0.08), in: Circle())
+                    if let markerFeedback {
+                        Text(t("Marked \(markerFeedback)"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .background(Color.blue.opacity(0.85), in: Capsule())
+                            .offset(y: 24)
+                    }
+                }
+                .frame(width: 44, height: 46)
+            }
+            .buttonStyle(.plain)
+            .disabled(!controller.isRecording || controller.isStopping)
+            .help(t("Add marker"))
+            .accessibilityLabel(t("Add marker"))
 
             Button {
                 controller.togglePauseRecording()

@@ -444,6 +444,19 @@ final class RecordingController: ObservableObject {
         registerUnfinishedRecording(state: isRecordingPaused ? "paused" : "recording")
     }
 
+    /// 录制中打标记：把当前成片时间点写进 <输出>_markers.json。
+    /// 讲课时想到"这段重来"或"这段保留"，点一下，剪辑时按标记定位。
+    @discardableResult
+    func addMarkerAtCurrentTime() -> RecordingMarker? {
+        guard isRecording else { return nil }
+        let marker = RecordingMarkerStore.append(
+            elapsedSeconds: recordingState.recordingDuration,
+            to: RecordingMarkerStore.markersURL(for: recordingState.outputURL)
+        )
+        print(String(format: "🔖 标记 %d（%.1fs）", marker.index + 1, marker.elapsedSeconds))
+        return marker
+    }
+
     func stopRecording(completion: (() -> Void)? = nil) {
         if let completion {
             pendingStopCompletions.append(completion)
