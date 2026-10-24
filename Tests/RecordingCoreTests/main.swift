@@ -1096,6 +1096,61 @@ func testIdleSpanDetection() throws {
                "闲段侧车命名应为 <base>_idle.json")
 }
 
+func testAgentEditPromptAndApplier() throws {
+    let context = AgentEditContext(
+        outputFileName: "ScreenRecord_test.mov",
+        durationSeconds: 42.5,
+        resolution: "2940 × 1912",
+        hasCameraTrack: false,
+        markers: [RecordingMarker(index: 0, elapsedSeconds: 12.3, createdAt: Date(timeIntervalSince1970: 0))],
+        transcript: [TranscriptSegment(start: 2, end: 5, text: "大家好")],
+        idleSuggestions: IdleSpanFile(
+            version: 1,
+            suggestedTrimStart: 1.5,
+            suggestions: [IdleSuggestion(span: IdleSpan(start: 9.25, end: 11.75), action: "cut", speed: 3)],
+            hint: ""
+        ),
+        zoomRanges: [ZoomRange(startSeconds: 2, endSeconds: 5, centerX: 0.3, centerY: 0.3)]
+    )
+    let prompt = AgentEditPromptBuilder.prompt(for: context)
+    try expect(prompt.contains("大家好"), "提示词应包含转写内容")
+    try expect(prompt.contains("标记 1"), "提示词应包含讲师标记")
+    try expect(prompt.contains("建议剪掉"), "提示词应包含闲段建议")
+    try expect(prompt.contains("edits.json 规范"), "提示词应自带操作规范")
+    try expect(prompt.contains("zoomMode"), "规范应说明 zoomMode")
+
+    let specJSON = """
+    {"cuts":[{"startTime":1.5,"endTime":42.5}],"zoom":[{"startSeconds":4,"endSeconds":8,"centerX":0.4,"centerY":0.4,"zoomScale":1.6,"easingSeconds":0.38}],"zoomMode":"replace","export":{"resolution":"p1080","cropTo16x9":true}}
+    """
+    let spec = try JSONDecoder().decode(AgentEditSpec.self, from: Data(specJSON.utf8))
+    let existing = [ZoomRange(startSeconds: 2, endSeconds: 5, centerX: 0.3, centerY: 0.3)]
+
+    let application = try AgentEditApplier.apply(spec, existingZoomRanges: existing)
+    try expect(application.editDecision.cuts.count == 1
+        && abs(application.editDecision.cuts[0].startTime - 1.5) < 1e-9, "cuts 应映射到剪辑决策")
+    try expect(application.zoomRanges.count == 1 && application.zoomRanges[0].startSeconds == 4,
+               "replace 模式应覆盖自动区间")
+    try expect(application.exportSettings.cropTo16x9 == true, "导出设置应映射")
+
+    var mergeSpec = spec
+    mergeSpec.zoomMode = "merge"
+    let merged = try AgentEditApplier.apply(mergeSpec, existingZoomRanges: existing)
+    try expect(merged.zoomRanges.count == 2, "merge 模式应合并自动区间与 AI 区间")
+
+    var noZoomSpec = spec
+    noZoomSpec.zoom = nil
+    noZoomSpec.zoomMode = nil
+    let kept = try AgentEditApplier.apply(noZoomSpec, existingZoomRanges: existing)
+    try expect(kept.zoomRanges.count == 1, "AI 未提运镜时应保留自动区间")
+
+    var bad = spec
+    bad.cuts = []
+    do {
+        _ = try AgentEditApplier.apply(bad)
+        try expect(false, "空 cuts 应报错")
+    } catch {}
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -1131,7 +1186,8 @@ let tests: [(String, () throws -> Void)] = [
     ("ZoomHeuristicDwell", testZoomHeuristicDwell),
     ("ZoomRangeStoreRoundTrip", testZoomRangeStoreRoundTrip),
     ("CursorPixelRendering", testCursorPixelRendering),
-    ("IdleSpanDetection", testIdleSpanDetection)
+    ("IdleSpanDetection", testIdleSpanDetection),
+    ("AgentEditPromptAndApplier", testAgentEditPromptAndApplier)
 ]
 
 do {

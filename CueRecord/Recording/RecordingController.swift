@@ -468,6 +468,29 @@ final class RecordingController: ObservableObject {
         cursorTracker.simulateEvent(globalLocation: CGPoint(x: x, y: y), isClick: click)
     }
 
+    /// Agent 剪辑：应用 edits.json 的结果。缩放区间改写前先备份
+    /// （_zoom.json → _zoom.json.bak，非破坏数据层，AI 再怎么乱来素材都安全），
+    /// 导出走应用自己的渲染管线——AI 只改参数，碰不到渲染。
+    func applyAgentEdits(_ application: AgentEditApplication, to capturedOutput: CapturedRecordingOutput) {
+        let zoomURL = ZoomRangeStore.zoomURL(for: capturedOutput.outputURL)
+        if FileManager.default.fileExists(atPath: zoomURL.path) {
+            let backupURL = URL(fileURLWithPath: zoomURL.path + ".bak")
+            try? FileManager.default.removeItem(at: backupURL)
+            try? FileManager.default.copyItem(at: zoomURL, to: backupURL)
+        }
+        if !application.zoomRanges.isEmpty {
+            ZoomRangeStore.save(
+                ZoomRangeFile(source: "agent", ranges: application.zoomRanges),
+                for: capturedOutput.outputURL
+            )
+        }
+        renderCapturedRecording(
+            capturedOutput,
+            editDecision: application.editDecision,
+            exportSettings: application.exportSettings
+        )
+    }
+
     func stopRecording(completion: (() -> Void)? = nil) {
         if let completion {
             pendingStopCompletions.append(completion)

@@ -150,6 +150,10 @@ struct CueRecordApp: App {
                 }
             }
             CommandGroup(after: .appSettings) {
+                Button(interfaceLanguage.text("Agent Edit…")) {
+                    AgentEditWindowController.shared.show()
+                }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
                 Button(interfaceLanguage.text("Settings…")) {
                     NotificationCenter.default.post(name: .openSettings, object: nil)
                 }
