@@ -375,7 +375,7 @@ grep -a "📊" /tmp/mem.log
 - 自动缩放默认开启（点击即缩放），暂无设置开关；不想要某条的缩放就删它的 `_zoom.json`。
 - 手动框选缩放未做：`ZoomRange` 数据结构已支持 manual 来源，缺编辑器 UI。
 - 点击音效未做（需要导出端混音）。
-- **暂停的实机验证仍未完成**：GUI 自动化尝试失败（本应用 SwiftUI 内容不暴露 AX、窗口截图不可用），只能人工验证——双击应用，录 10s → 暂停 10s → 恢复 10s → 停止，导出成片应约 20s 且 `_cursor.json` 的时间跨度也应约 20s。
+- ~~暂停的实机验证仍未完成~~ **已闭环（2026-10-24）**：内置自测入口 `--smoke-record` 全自动验证（录 3s → 暂停 3s → 恢复 3s → 停止 → 导出）。实测：墙钟 9s+（含 3.2s 暂停）→ 成片 6.48s，暂停段确实被剪掉；标记/光标轨/自动缩放/导出全通过。复跑：`open --env NSUnbufferedIO=YES --stdout /tmp/smoke.log ~/Applications/LLSStudio.app --args --smoke-record`，报告在 `/tmp/llsstudio-smoke-report.json`。
 
 **打包**：2.7.1 (build 27)。DMG 在桌面 `LLSStudio-2.7.1.dmg`；旧 2.6.5 DMG 已删除（旧版可从 `e5f42b0` 重建）。
 

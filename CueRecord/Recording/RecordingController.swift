@@ -140,7 +140,9 @@ final class RecordingController: ObservableObject {
 
     /// 异常退出后启动：清单里还有未收尾的录制时明确告知。
     /// 无声处理的话，坏文件要等到用户导出看到黑屏才被发现。
+    /// 自测模式跳过（避免阻塞无人值守流程）。
     private func presentUnfinishedRecordingRecoveryIfNeeded() {
+        guard !RecordingSmokeTestRunner.isRequested else { return }
         guard let storeURL = unfinishedStoreURL else { return }
         var entries = UnfinishedRecordingStore.load(from: storeURL)
         let goneIDs = UnfinishedRecordingStore.entryIDsWithoutOutput(entries)

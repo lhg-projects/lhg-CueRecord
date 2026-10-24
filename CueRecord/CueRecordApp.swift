@@ -123,6 +123,10 @@ struct CueRecordApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    // 内置自测：open LLSStudio.app --args --smoke-record
+                    await RecordingSmokeTestRunner.runIfNeeded()
+                }
                 .onOpenURL { url in
                     if url.hasDirectoryPath || supportedCueRecordFileExtensions.contains(url.pathExtension.lowercased()) {
                         CueRecordService.shared.openFileAtURL(url)
