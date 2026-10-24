@@ -126,8 +126,10 @@ final class CursorEventTracker {
         lastMoveSample = nil
         self.elapsedProvider = elapsedProvider
 
+        // leftMouseDragged 让"框选/选中文字"的拖拽路径也产生移动样本，
+        // 停留检测才能在选中后停在的位置放大
         let mask: NSEvent.EventTypeMask = [
-            .mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown
+            .mouseMoved, .leftMouseDragged, .leftMouseDown, .rightMouseDown, .otherMouseDown
         ]
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
             Task { @MainActor [weak self] in

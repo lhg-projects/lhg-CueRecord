@@ -365,8 +365,9 @@ grep -a "📊" /tmp/mem.log
 | `24e14f3` | 光标事件轨 | NSEvent 采样（无需辅助功能权限）→ `<base>_cursor.json`；录制时隐藏系统光标 |
 | `b03846e` | 自绘光标 | 导出渲染大号平滑箭头（约 1.4 倍）+ 点击波纹 0.45s |
 | `102dc82` | 自动缩放 | 停录按点击聚类生成 `<base>_zoom.json`，导出时 easeIn/OutCubic 缓动放大（1.9x，0.38s 进出） |
+| 2.7.1 | 悬停停留缩放 | 鼠标在某处静置 ≥1.8s（阅读/讲解中）也触发温和放大（1.5x）；开录静止、讲完停住都算；指针搁在屏幕边缘（闲置）不缩放；点击与停留区间重叠时合并、点击倍率优先；拖拽（选中文字）也纳入光标采样 |
 
-核心测试从 23 项增至 **31 项**（新增：Preflight、UnfinishedStore、MarkerStore、Transcript、Cursor 轨道/节流/插值/资源、ZoomTimeline/Heuristic/Store、**CursorPixelRendering** 像素级验证真实渲染路径）。新源文件都在 `CueRecord/Recording/Core/Recording/`，加文件时记得同步 `scripts/run-recording-core-tests.sh` 的 swiftc 列表。
+核心测试从 23 项增至 **32 项**（新增：Preflight、UnfinishedStore、MarkerStore、Transcript、Cursor 轨道/节流/插值/资源、ZoomTimeline/Heuristic(点击+停留)/Store、**CursorPixelRendering** 像素级验证真实渲染路径）。新源文件都在 `CueRecord/Recording/Core/Recording/`，加文件时记得同步 `scripts/run-recording-core-tests.sh` 的 swiftc 列表。
 
 **已知边界（下一轮可做）**：
 - 窗口录制模式下，光标归一化以开录时的窗口位置为基准，窗口移动后坐标会漂移（全屏 / 区域模式精确）。
@@ -376,7 +377,7 @@ grep -a "📊" /tmp/mem.log
 - 点击音效未做（需要导出端混音）。
 - **暂停的实机验证仍未完成**：GUI 自动化尝试失败（本应用 SwiftUI 内容不暴露 AX、窗口截图不可用），只能人工验证——双击应用，录 10s → 暂停 10s → 恢复 10s → 停止，导出成片应约 20s 且 `_cursor.json` 的时间跨度也应约 20s。
 
-**打包**：2.7.0 (build 26)。DMG 在桌面 `LLSStudio-2.7.0.dmg`；旧 2.6.5 DMG 已删除（旧版可从 `e5f42b0` 重建）。
+**打包**：2.7.1 (build 27)。DMG 在桌面 `LLSStudio-2.7.1.dmg`；旧 2.6.5 DMG 已删除（旧版可从 `e5f42b0` 重建）。
 
 ### 排查经验（省时间用）
 

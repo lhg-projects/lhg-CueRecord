@@ -126,11 +126,14 @@ nonisolated enum ZoomTimeline {
     }
 }
 
-/// 自动缩放启发式（学习 Screen Studio：点击 = 注意力焦点）。
+/// 自动缩放启发式（学习 Screen Studio：注意力 = 点击 + 停留）。
 /// 纯函数，输入光标事件轨，输出缩放区间：
-/// - 点击前 lead 秒开始放大（点之前就到位，观感跟手）
-/// - 停止点击 hold 秒后开始退出
-/// - 间隔短、距离近的连续点击并成一个区间（质心）
+/// - 点击：点前 lead 秒开始放大（先到位、观感跟手），停点 hold 秒后退出
+/// - 停留：光标在某处静置超过阈值（用户在读/在讲这块），温和放大；
+///   采样器静止时不产样本，所以样本流里的"时间沟"就是停留时长，
+///   时间轴是成片时间，暂停段天然不产生假停留
+/// - 前导/尾部静默（开录没动鼠标、讲完停住）也算停留
+/// - 点击与停留区间重叠时合并：跨度和中心取加权，倍率取点击（更强）
 /// - 过短的区间丢弃（不值得缩）
 nonisolated enum ZoomHeuristic {
     struct Configuration: Sendable {
@@ -141,16 +144,55 @@ nonisolated enum ZoomHeuristic {
         var minimumRangeSeconds: Double = 1.4
         var zoomScale: Double = 1.9
         var easingSeconds: Double = 0.38
+        // 停留（悬停阅读）参数
+        var dwellRadius: Double = 0.03
+        var dwellMinimumSeconds: Double = 1.8
+        var dwellZoomScale: Double = 1.5
+        var dwellHoldSeconds: Double = 0.8
+        /// 停留开始后多久开始放大（不能一停就缩，那是指针在喘气不是在阅读）
+        var dwellEngageDelayFraction: Double = 0.3
+        /// 停在屏幕边缘（闲置搁放指针）不算阅读，不缩放
+        var dwellEdgeMargin: Double = 0.04
     }
 
-    static func ranges(from events: [CursorEventSample], configuration: Configuration = Configuration()) -> [ZoomRange] {
-        let clicks = events.filter { $0.c == 1 }.sorted { $0.t < $1.t }
+    static func ranges(
+        from events: [CursorEventSample],
+        totalDuration: Double? = nil,
+        configuration: Configuration = Configuration()
+    ) -> [ZoomRange] {
+        let sorted = events.sorted { $0.t < $1.t }
+        guard !sorted.isEmpty else { return [] }
+        let endTime = totalDuration ?? sorted[sorted.count - 1].t
+
+        let clickRanges = clickRanges(from: sorted, configuration: configuration)
+        let dwellRanges = dwellRanges(from: sorted, endTime: endTime, configuration: configuration)
+        let merged = mergeRanges(clickRanges: clickRanges, dwellRanges: dwellRanges)
+
+        return merged
+            .filter { $0.endSeconds - $0.startSeconds >= configuration.minimumRangeSeconds }
+            .map { range -> ZoomRange in
+                var clamped = range
+                clamped.startSeconds = max(0, range.startSeconds)
+                // 只有明确知道片长才钳终点；不知道时不砍自然收尾
+                if let totalDuration {
+                    clamped.endSeconds = min(range.endSeconds, totalDuration)
+                }
+                return clamped
+            }
+    }
+
+    /// 点击聚类 → 区间
+    private static func clickRanges(
+        from events: [CursorEventSample],
+        configuration: Configuration
+    ) -> [ZoomRange] {
+        let clicks = events.filter { $0.c == 1 }
         guard !clicks.isEmpty else { return [] }
 
         struct Cluster {
-            var times: [Double]
-            var sumX: Double
-            var sumY: Double
+            var times: [Double] = []
+            var sumX: Double = 0
+            var sumY: Double = 0
         }
 
         var clusters: [Cluster] = []
@@ -168,25 +210,108 @@ nonisolated enum ZoomHeuristic {
             }
         }
 
-        var result: [ZoomRange] = []
-        for cluster in clusters {
+        return clusters.map { cluster in
             let count = Double(cluster.times.count)
-            let start = (cluster.times.min() ?? 0) - configuration.leadSeconds
-            let end = (cluster.times.max() ?? 0) + configuration.holdSeconds
-            // 相邻区间重叠时前一个提前收尾，避免缩放来回抖
-            if let previousEnd = result.last?.endSeconds, start < previousEnd {
-                result[result.count - 1].endSeconds = max(start - 0.05, result[result.count - 1].startSeconds + configuration.easingSeconds * 2)
-            }
-            guard end - start >= configuration.minimumRangeSeconds else { continue }
-            result.append(ZoomRange(
-                startSeconds: max(0, start),
-                endSeconds: end,
+            return ZoomRange(
+                startSeconds: (cluster.times.min() ?? 0) - configuration.leadSeconds,
+                endSeconds: (cluster.times.max() ?? 0) + configuration.holdSeconds,
                 centerX: cluster.sumX / count,
                 centerY: cluster.sumY / count,
                 zoomScale: configuration.zoomScale,
                 easingSeconds: configuration.easingSeconds
-            ))
+            )
         }
-        return result
+    }
+
+    /// 停留（悬停）→ 区间。时间沟两端位移在半径内才算真的停住了。
+    private static func dwellRanges(
+        from samples: [CursorEventSample],
+        endTime: Double,
+        configuration: Configuration
+    ) -> [ZoomRange] {
+        var candidates: [(start: Double, end: Double, x: Double, y: Double)] = []
+
+        // 前导静默：开录后到首个样本之间光标没动过
+        if let first = samples.first, first.t >= configuration.dwellMinimumSeconds {
+            candidates.append((0, first.t, first.x, first.y))
+        }
+
+        // 相邻样本间的时间沟 = 停留
+        for (a, b) in zip(samples, samples.dropFirst()) {
+            let gap = b.t - a.t
+            guard gap >= configuration.dwellMinimumSeconds else { continue }
+            guard abs(a.x - b.x) <= configuration.dwellRadius,
+                  abs(a.y - b.y) <= configuration.dwellRadius else { continue }
+            candidates.append((a.t, b.t, (a.x + b.x) / 2, (a.y + b.y) / 2))
+        }
+
+        // 尾部静默：最后一个样本到录制结束之间光标没动（需要 totalDuration 才知道；
+        // 没传时 endTime 即最后样本时刻，间距为 0，自然不触发）
+        if let last = samples.last, endTime > last.t {
+            let gap = endTime - last.t
+            if gap >= configuration.dwellMinimumSeconds {
+                candidates.append((last.t, endTime, last.x, last.y))
+            }
+        }
+
+        let engageDelay = min(0.6, configuration.dwellMinimumSeconds * configuration.dwellEngageDelayFraction)
+        let margin = configuration.dwellEdgeMargin
+        return candidates
+            .filter { candidate in
+                candidate.x >= margin && candidate.x <= 1 - margin
+                    && candidate.y >= margin && candidate.y <= 1 - margin
+            }
+            .map { candidate in
+                ZoomRange(
+                    startSeconds: candidate.start + engageDelay,
+                    endSeconds: candidate.end + configuration.dwellHoldSeconds,
+                    centerX: candidate.x,
+                    centerY: candidate.y,
+                    zoomScale: configuration.dwellZoomScale,
+                    easingSeconds: configuration.easingSeconds
+                )
+            }
+    }
+
+    /// 点击与停留区间合并：重叠（或贴着 ≤0.3s）的并成一个，
+    /// 时间取并集，倍率取大者，中心按"点击权重 3、停留权重 1"加权。
+    private static func mergeRanges(
+        clickRanges: [ZoomRange],
+        dwellRanges: [ZoomRange],
+        gapTolerance: Double = 0.3
+    ) -> [ZoomRange] {
+        struct Tagged {
+            let range: ZoomRange
+            let clickWeight: Double
+        }
+
+        let all: [Tagged] = clickRanges.map { Tagged(range: $0, clickWeight: 3) }
+            + dwellRanges.map { Tagged(range: $0, clickWeight: 1) }
+        guard !all.isEmpty else { return [] }
+
+        let sorted = all.sorted { $0.range.startSeconds < $1.range.startSeconds }
+        var merged: [ZoomRange] = []
+        var current = sorted[0]
+        for next in sorted.dropFirst() {
+            if next.range.startSeconds <= current.range.endSeconds + gapTolerance {
+                let weight = current.clickWeight + next.clickWeight
+                current = Tagged(
+                    range: ZoomRange(
+                        startSeconds: min(current.range.startSeconds, next.range.startSeconds),
+                        endSeconds: max(current.range.endSeconds, next.range.endSeconds),
+                        centerX: (current.range.centerX * current.clickWeight + next.range.centerX * next.clickWeight) / weight,
+                        centerY: (current.range.centerY * current.clickWeight + next.range.centerY * next.clickWeight) / weight,
+                        zoomScale: max(current.range.zoomScale, next.range.zoomScale),
+                        easingSeconds: max(current.range.easingSeconds, next.range.easingSeconds)
+                    ),
+                    clickWeight: weight
+                )
+            } else {
+                merged.append(current.range)
+                current = next
+            }
+        }
+        merged.append(current.range)
+        return merged
     }
 }

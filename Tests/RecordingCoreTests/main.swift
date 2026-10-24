@@ -878,6 +878,7 @@ func testZoomHeuristicFromClicks() throws {
     ])
     try expect(single.count == 1, "单次点击应生成一个区间")
     if let r = single.first {
+        // 点击样本把时间沟切成两段(各 1s)，不足以判定停留，区间就是纯点击区间
         try expect(abs(r.startSeconds - 1.55) < 1e-9, "区间应在点击前 0.45s 开始（先导）")
         try expect(abs(r.endSeconds - 3.7) < 1e-9, "区间应在点击后 1.7s 结束（保持）")
         try expect(abs(r.centerX - 0.3) < 1e-9, "聚焦中心应为点击位置")
@@ -895,6 +896,68 @@ func testZoomHeuristicFromClicks() throws {
         CursorEventSample(t: 10.0, x: 0.8, y: 0.8, c: 1)
     ])
     try expect(two.count == 2, "远距离两次点击应各自成区间")
+}
+
+func testZoomHeuristicDwell() throws {
+    // 停在 (0.4,0.4) 约 3.2s 后移走 → 温和缩放区间
+    let dwell = ZoomHeuristic.ranges(from: [
+        CursorEventSample(t: 1.0, x: 0.4, y: 0.4),
+        CursorEventSample(t: 4.2, x: 0.42, y: 0.4),
+        CursorEventSample(t: 4.3, x: 0.7, y: 0.7)
+    ], totalDuration: 6.0)
+    try expect(dwell.count == 1, "悬停停留应生成一个缩放区间")
+    if let r = dwell.first {
+        let engage = min(0.6, 1.8 * 0.3)
+        try expect(abs(r.startSeconds - (1.0 + engage)) < 1e-9, "停留后应延迟进入（喘气不算阅读）")
+        try expect(abs(r.endSeconds - 5.0) < 1e-9, "移开后保持 0.8s 再退出")
+        try expect(r.zoomScale == 1.5, "停留应使用温和倍率")
+    }
+
+    // 时间沟两端位移过大 → 不是停留，是光标去了别处（中间没有采样是异常数据）
+    let moved = ZoomHeuristic.ranges(from: [
+        CursorEventSample(t: 1.0, x: 0.2, y: 0.2),
+        CursorEventSample(t: 4.0, x: 0.9, y: 0.9)
+    ], totalDuration: 4.2)
+    try expect(moved.isEmpty, "大位移的时间沟不应判为停留")
+
+    // 尾部静默：讲完停住到结束 → 停留区间，终点钳到片长
+    let trailing = ZoomHeuristic.ranges(from: [
+        CursorEventSample(t: 0.5, x: 0.6, y: 0.6),
+        CursorEventSample(t: 0.7, x: 0.62, y: 0.6)
+    ], totalDuration: 4.0)
+    try expect(trailing.count == 1, "尾部静默也是停留")
+    if let r = trailing.first {
+        try expect(r.endSeconds <= 4.0 + 1e-9, "区间终点必须钳在片长内")
+    }
+
+    // 前导静默：开录 3s 没动鼠标 → 从头停留
+    let leading = ZoomHeuristic.ranges(from: [
+        CursorEventSample(t: 3.0, x: 0.3, y: 0.3)
+    ], totalDuration: 4.0)
+    try expect(leading.count == 1, "开录静止也是停留")
+
+    // 持续移动 + 最后把指针搁在屏幕边缘（闲置）→ 无区间
+    let busy = ZoomHeuristic.ranges(from: [
+        CursorEventSample(t: 0.0, x: 0.1, y: 0.1),
+        CursorEventSample(t: 0.2, x: 0.3, y: 0.1),
+        CursorEventSample(t: 0.4, x: 0.01, y: 0.5)
+    ], totalDuration: 5.0)
+    try expect(busy.isEmpty, "持续移动 + 指针搁在边缘闲置，不应缩放")
+
+    // 点击后原地继续停留 → 区间并到停留结束，倍率取点击（操作强于阅读）
+    let clickThenDwell = ZoomHeuristic.ranges(from: [
+        CursorEventSample(t: 1.0, x: 0.4, y: 0.4),
+        CursorEventSample(t: 2.5, x: 0.4, y: 0.4, c: 1),
+        CursorEventSample(t: 5.0, x: 0.41, y: 0.4)
+    ], totalDuration: 6.0)
+    try expect(clickThenDwell.count == 1, "点击与其后停留应合并为一个区间")
+    if let r = clickThenDwell.first {
+        // 点击区间 [2.05, 4.2] × 停留区间 [3.04, 5.8] → 合并
+        try expect(abs(r.startSeconds - 2.05) < 1e-9, "合并后应从点击先导开始")
+        try expect(abs(r.endSeconds - 5.8) < 1e-9, "合并后应到停留保持结束")
+        try expect(r.zoomScale == 1.9, "重叠时点击倍率优先")
+        try expect(abs(r.centerX - 0.40125) < 1e-9, "中心按点击 3 / 停留 1 加权")
+    }
 }
 
 func testZoomRangeStoreRoundTrip() throws {
@@ -1014,6 +1077,7 @@ let tests: [(String, () throws -> Void)] = [
     ("CursorRendererAssets", testCursorRendererAssets),
     ("ZoomTimelineEasingAndCrop", testZoomTimelineEasingAndCrop),
     ("ZoomHeuristicFromClicks", testZoomHeuristicFromClicks),
+    ("ZoomHeuristicDwell", testZoomHeuristicDwell),
     ("ZoomRangeStoreRoundTrip", testZoomRangeStoreRoundTrip),
     ("CursorPixelRendering", testCursorPixelRendering)
 ]
