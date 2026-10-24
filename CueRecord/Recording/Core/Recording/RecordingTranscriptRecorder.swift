@@ -72,4 +72,9 @@ nonisolated enum TranscriptSRTSerializer {
         let srt = srtText(from: segments)
         try? srt.data(using: .utf8)?.write(to: srtURL(for: outputURL), options: .atomic)
     }
+
+    static func loadTranscript(for outputURL: URL) -> [TranscriptSegment] {
+        guard let data = try? Data(contentsOf: transcriptURL(for: outputURL)) else { return [] }
+        return (try? JSONDecoder().decode([TranscriptSegment].self, from: data)) ?? []
+    }
 }

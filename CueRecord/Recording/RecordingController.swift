@@ -507,6 +507,7 @@ final class RecordingController: ObservableObject {
             cursorTracker.stopSavingOutput(expectedOutputURL)
             generateAutoZoomRanges(outputURL: expectedOutputURL)
             endTranscriptCapture(outputURL: expectedOutputURL)
+            writeIdleSuggestions(outputURL: expectedOutputURL)
             presentDamageAlertIfNeeded(
                 validation: screenRecorder.lastValidation,
                 outputURL: expectedOutputURL
@@ -647,6 +648,22 @@ final class RecordingController: ObservableObject {
         guard !ranges.isEmpty else { return }
         ZoomRangeStore.save(ZoomRangeFile(source: "auto-clicks-and-dwell", ranges: ranges), for: outputURL)
         print("🔍 自动缩放区间: \(ranges.count) 个 → \(outputURL.deletingPathExtension().lastPathComponent)_zoom.json")
+    }
+
+    /// 闲段建议：没说话∧没操作的段（剪掉或 3×），加开录头 1.5s 裁剪建议。
+    /// 消费方是 Agent 剪辑提示词；转写缺失时宁缺毋滥。
+    private func writeIdleSuggestions(outputURL: URL) {
+        let transcript = TranscriptSRTSerializer.loadTranscript(for: outputURL)
+        let cursorTrack = CursorEventStore.load(from: CursorEventStore.cursorURL(for: outputURL))
+        let idle = RecordingIdleSpanDetector.detect(
+            totalDuration: recordingState.currentElapsed(),
+            transcript: transcript,
+            cursorEvents: cursorTrack?.events ?? []
+        )
+        IdleSpanStore.save(idle, for: outputURL)
+        if !idle.suggestions.isEmpty {
+            print("💤 闲段建议: \(idle.suggestions.count) 段 → \(outputURL.deletingPathExtension().lastPathComponent)_idle.json")
+        }
     }
 
     private func beginTranscriptCapture() {

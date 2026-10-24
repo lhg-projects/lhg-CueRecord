@@ -1047,6 +1047,55 @@ func testCursorPixelRendering() throws {
                "光标落在缩放裁切外时不应绘制")
 }
 
+func testIdleSpanDetection() throws {
+    let transcript: [TranscriptSegment] = [
+        TranscriptSegment(start: 2.0, end: 4.0, text: "大家好"),
+        TranscriptSegment(start: 6.0, end: 9.0, text: "看这个按钮"),
+        TranscriptSegment(start: 12.0, end: 14.0, text: "总结一下")
+    ]
+    let cursor: [CursorEventSample] = [
+        CursorEventSample(t: 2.5, x: 0.3, y: 0.3),
+        CursorEventSample(t: 6.5, x: 0.4, y: 0.4, c: 1),
+        CursorEventSample(t: 12.5, x: 0.5, y: 0.5)
+    ]
+
+    let result = RecordingIdleSpanDetector.detect(
+        totalDuration: 15.0, transcript: transcript, cursorEvents: cursor
+    )
+
+    try expect(result.suggestedTrimStart == 1.5, "应建议裁掉开录头 1.5s")
+
+    try expect(result.suggestions.count == 2, "应检出两段闲段（实际 \(result.suggestions.count)）")
+    if result.suggestions.count == 2 {
+        let sorted = result.suggestions.sorted { $0.span.start < $1.span.start }
+        try expect(abs(sorted[0].span.start - 4.25) < 0.01 && abs(sorted[0].span.end - 5.75) < 0.01,
+                   "第一段闲段应取说话段间的空隙（含保护边）")
+        try expect(sorted[0].action == "speed", "约 1.5s 的段应建议加速而不是剪")
+        try expect(abs(sorted[1].span.start - 9.25) < 0.01 && abs(sorted[1].span.end - 11.75) < 0.01,
+                   "第二段闲段应正确")
+        try expect(sorted[1].action == "cut", "≥2.5s 的段应建议剪掉")
+    }
+
+    // 没有转写 → 宁缺毋滥，不给闲段建议
+    let noTranscript = RecordingIdleSpanDetector.detect(
+        totalDuration: 15.0, transcript: [], cursorEvents: cursor
+    )
+    try expect(noTranscript.suggestions.isEmpty, "转写缺失时不应给闲段建议")
+    try expect(noTranscript.suggestedTrimStart == 1.5, "开头裁剪建议仍应给出")
+
+    // 侧车往返
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("idle-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+    let outputURL = tempDir.appendingPathComponent("ScreenRecord_i.mov")
+    IdleSpanStore.save(result, for: outputURL)
+    try expect(IdleSpanStore.load(from: IdleSpanStore.idleURL(for: outputURL)) == result,
+               "闲段建议应可完整往返")
+    try expect(IdleSpanStore.idleURL(for: outputURL).lastPathComponent == "ScreenRecord_i_idle.json",
+               "闲段侧车命名应为 <base>_idle.json")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -1081,7 +1130,8 @@ let tests: [(String, () throws -> Void)] = [
     ("ZoomHeuristicFromClicks", testZoomHeuristicFromClicks),
     ("ZoomHeuristicDwell", testZoomHeuristicDwell),
     ("ZoomRangeStoreRoundTrip", testZoomRangeStoreRoundTrip),
-    ("CursorPixelRendering", testCursorPixelRendering)
+    ("CursorPixelRendering", testCursorPixelRendering),
+    ("IdleSpanDetection", testIdleSpanDetection)
 ]
 
 do {
