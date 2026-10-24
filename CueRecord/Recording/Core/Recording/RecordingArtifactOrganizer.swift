@@ -114,11 +114,76 @@ nonisolated enum RecordingExportBitRatePreset: String, CaseIterable, Identifiabl
     }
 }
 
+nonisolated enum RecordingExportCanvasAspect: String, Codable, CaseIterable, Identifiable, Equatable, Sendable {
+    case source
+    case wide16x9
+    case vertical9x16
+
+    var id: String { rawValue }
+
+    /// 目标宽高比；source 返回 nil（跟随源比例）
+    var aspectRatio: CGFloat? {
+        switch self {
+        case .source: return nil
+        case .wide16x9: return 16.0 / 9.0
+        case .vertical9x16: return 9.0 / 16.0
+        }
+    }
+}
+
+/// 发布平台预设（学习 HuaStudio 的中国平台适配：一键调成平台最优）。
+nonisolated enum PlatformExportPreset: String, CaseIterable, Identifiable, Equatable, Sendable {
+    case original
+    case bilibili
+    case xiaohongshu
+    case douyin
+    case shipinhao
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .original: return "Keep original"
+        case .bilibili: return "Bilibili (16:9)"
+        case .xiaohongshu: return "Xiaohongshu (9:16)"
+        case .douyin: return "Douyin (9:16)"
+        case .shipinhao: return "WeChat Channels (9:16)"
+        }
+    }
+
+    var canvasAspect: RecordingExportCanvasAspect {
+        switch self {
+        case .original: return .source
+        case .bilibili: return .wide16x9
+        case .xiaohongshu, .douyin, .shipinhao: return .vertical9x16
+        }
+    }
+
+    /// 竖屏平台开美化（底色 + 留白 + 圆角），B 站保持满幅
+    var beautifyEnabled: Bool {
+        switch self {
+        case .original, .bilibili: return false
+        case .xiaohongshu, .douyin, .shipinhao: return true
+        }
+    }
+}
+
 nonisolated struct RecordingExportSettings: Equatable, Sendable {
     var resolutionPreset: RecordingExportResolutionPreset
     var bitRatePreset: RecordingExportBitRatePreset
     /// 裁成 16:9。整屏录制的画面比例通常不是 16:9，直接上传会被加黑边。
+    /// 仅在 canvasAspect == .source 时生效；指定了画布比例后由画布说了算。
     var cropTo16x9: Bool = false
+    /// 画布比例（发布平台）。
+    var canvasAspect: RecordingExportCanvasAspect = .source
+    /// 美化画布：底色 + 留白 + 圆角，画面像悬浮在壁纸上。
+    /// 参数取 HuaStudio 1.8 实测默认值（留白 10.5%、圆角 20、默认无阴影）。
+    var beautifyEnabled = false
+    var beautifyPaddingRatio: Double = 0.1049
+    var beautifyCornerRadiusPoints: Double = 20
+
+    /// 墨岩（slate）底色：深灰蓝，中性不抢戏
+    static let beautifySlateBackground = (red: 51.0 / 255.0, green: 65.0 / 255.0, blue: 85.0 / 255.0)
 
     static let `default` = RecordingExportSettings(
         resolutionPreset: .p1080,
@@ -128,6 +193,25 @@ nonisolated struct RecordingExportSettings: Equatable, Sendable {
 
     private var resolutionPresetLongEdge: CGFloat {
         resolutionPreset.outputSize(for: CGSize(width: 10_000, height: 10_000)).width
+    }
+
+    /// 画布尺寸：指定画幅时按分辨率长边推出（1080p 竖屏 = 1080×1920）；
+    /// source 时退回原有逻辑（含 cropTo16x9 裁切）。
+    func canvasSize(for sourceSize: CGSize) -> CGSize {
+        guard let aspect = canvasAspect.aspectRatio else {
+            return outputSize(for: sourceSize)
+        }
+        let longEdge = resolutionPresetLongEdge
+        if aspect >= 1 {
+            return CGSize(
+                width: Self.evenPixelDimension(longEdge),
+                height: Self.evenPixelDimension(longEdge / aspect)
+            )
+        }
+        return CGSize(
+            width: Self.evenPixelDimension(longEdge * aspect),
+            height: Self.evenPixelDimension(longEdge)
+        )
     }
 
     func outputSize(for sourceSize: CGSize) -> CGSize {

@@ -1151,6 +1151,45 @@ func testAgentEditPromptAndApplier() throws {
     } catch {}
 }
 
+func testPlatformPresetCanvasSizes() throws {
+    let source = CGSize(width: 2940, height: 1912)
+
+    // 发布画幅的画布尺寸（1080p）
+    var vertical = RecordingExportSettings.default
+    vertical.canvasAspect = .vertical9x16
+    let verticalSize = vertical.canvasSize(for: source)
+    try expect(verticalSize == CGSize(width: 1080, height: 1920),
+               "1080p 竖屏画布应为 1080×1920（实际 \(verticalSize)）")
+
+    var wide = RecordingExportSettings.default
+    wide.canvasAspect = .wide16x9
+    let wideSize = wide.canvasSize(for: source)
+    try expect(wideSize == CGSize(width: 1920, height: 1080),
+               "1080p 横屏画布应为 1920×1080（实际 \(wideSize)）")
+
+    // source 保持原逻辑（cropTo16x9 裁切），不受画幅字段影响
+    let sourceSize = RecordingExportSettings.default.canvasSize(for: source)
+    try expect(sourceSize == RecordingExportSettings.default.outputSize(for: source),
+               "source 画幅应退回原有输出逻辑")
+
+    // 平台预设映射
+    try expect(PlatformExportPreset.douyin.canvasAspect == .vertical9x16
+        && PlatformExportPreset.douyin.beautifyEnabled, "抖音应为竖屏+美化")
+    try expect(PlatformExportPreset.xiaohongshu.canvasAspect == .vertical9x16
+        && PlatformExportPreset.xiaohongshu.beautifyEnabled, "小红书应为竖屏+美化")
+    try expect(PlatformExportPreset.shipinhao.canvasAspect == .vertical9x16, "视频号应为竖屏")
+    try expect(PlatformExportPreset.bilibili.canvasAspect == .wide16x9
+        && !PlatformExportPreset.bilibili.beautifyEnabled, "B 站应为横屏满幅")
+    try expect(PlatformExportPreset.original.canvasAspect == .source
+        && !PlatformExportPreset.original.beautifyEnabled, "原样应保持旧逻辑")
+
+    // 美化参数取 HuaStudio 实测默认值
+    try expect(abs(RecordingExportSettings.default.beautifyPaddingRatio - 0.1049) < 1e-9,
+               "留白默认 10.5%")
+    try expect(RecordingExportSettings.default.beautifyCornerRadiusPoints == 20,
+               "圆角默认 20pt")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("AudioStartGate", testAudioStartGate),
     ("BoundedDropOldestBuffer", testBoundedDropOldestBuffer),
@@ -1187,7 +1226,8 @@ let tests: [(String, () throws -> Void)] = [
     ("ZoomRangeStoreRoundTrip", testZoomRangeStoreRoundTrip),
     ("CursorPixelRendering", testCursorPixelRendering),
     ("IdleSpanDetection", testIdleSpanDetection),
-    ("AgentEditPromptAndApplier", testAgentEditPromptAndApplier)
+    ("AgentEditPromptAndApplier", testAgentEditPromptAndApplier),
+    ("PlatformPresetCanvasSizes", testPlatformPresetCanvasSizes)
 ]
 
 do {

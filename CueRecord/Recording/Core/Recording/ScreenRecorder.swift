@@ -117,6 +117,11 @@ class ScreenRecorder: NSObject, ObservableObject {
     /// 最近一次停录的产物校验结果。停录后由 RecordingController 读取，
     /// 用于向用户报告"此条录制损坏"，而不是等导出时才看到黑屏。
     private(set) var lastValidation: RecordingOutputValidation?
+    /// 视频轨已写入的最后一帧时间戳。暂停/恢复边界上偶发非单调帧
+    /// （2026-10-23 黑屏事故与 2026-10-24 自测复现：恢复后首帧 append 失败，
+    /// writer 直接 .failed，moov 永远写不出来）。护栏：非单调帧丢弃，
+    /// 丢一帧无感，毒死 writer 是全损。
+    private var lastAppendedVideoPTS: CMTime?
     private var screenCapturePixelFormat: OSType = kCVPixelFormatType_32BGRA
     
     // 录制配置
@@ -247,6 +252,7 @@ class ScreenRecorder: NSObject, ObservableObject {
 
         print("🎬 开始屏幕录制...")
         self.hideSystemCursor = hideSystemCursor
+        lastAppendedVideoPTS = nil
 
         do {
             self.outputURL = outputURL
@@ -1405,7 +1411,7 @@ class ScreenRecorder: NSObject, ObservableObject {
         }
 
         let screenSize = Self.normalizedVideoSize(for: screenTrack)
-        let outputSize = exportSettings.outputSize(for: screenSize)
+        let outputSize = exportSettings.canvasSize(for: screenSize)
         let outputWidth = Int(outputSize.width)
         let outputHeight = Int(outputSize.height)
 
@@ -1479,9 +1485,12 @@ class ScreenRecorder: NSObject, ObservableObject {
         _ = bufferExtent
         // 合成阶段始终按「未裁切」的完整画面布局，气泡坐标才不会整体偏移；
         // 裁切放在最后一步，只影响输出尺寸。
-        let composeSize = exportSettings.cropTo16x9
-            ? exportSettings.resolutionPreset.outputSize(for: screenSize)
-            : CGSize(width: outputWidth, height: outputHeight)
+        let composeSize: CGSize
+        if exportSettings.canvasAspect == .source && exportSettings.cropTo16x9 {
+            composeSize = exportSettings.resolutionPreset.outputSize(for: screenSize)
+        } else {
+            composeSize = CGSize(width: outputWidth, height: outputHeight)
+        }
         let outputExtent = CGRect(origin: .zero, size: composeSize)
 
         // 自绘光标：事件轨存在才启用（录制时源画面已隐藏系统光标）
@@ -1489,12 +1498,15 @@ class ScreenRecorder: NSObject, ObservableObject {
         var cursorSampler = CursorEventSampler(samples: cursorTrack?.events ?? [])
         let cursorCI: CIImage? = cursorTrack == nil ? nil : CursorRenderer.arrowCGImage().map { CIImage(cgImage: $0) }
         let rippleCI: CIImage? = cursorTrack == nil ? nil : CursorRenderer.rippleCGImage().map { CIImage(cgImage: $0) }
-        let cursorContentRect = CursorRenderer.contentRect(
-            sourceExtent: CGRect(origin: .zero, size: screenSize),
-            in: outputExtent
-        )
         // 自动缩放：点击聚焦区间
         let zoomRanges = ZoomRangeStore.load(from: ZoomRangeStore.zoomURL(for: screenURL))?.ranges ?? []
+        let beautifyPadding = exportSettings.beautifyEnabled ? exportSettings.beautifyPaddingRatio : 0
+        let beautifyRadius = exportSettings.beautifyEnabled ? exportSettings.beautifyCornerRadiusPoints : 0
+        let cursorContentRect = CursorRenderer.contentRect(
+            sourceExtent: CGRect(origin: .zero, size: screenSize),
+            in: outputExtent,
+            paddingRatio: beautifyPadding
+        )
 
         func advanceCameraFrame(to screenTime: CMTime) {
             while let sample = nextCameraSample {
@@ -1541,7 +1553,9 @@ class ScreenRecorder: NSObject, ObservableObject {
                     overlaySample: sample,
                     metadata: metadata,
                     outputExtent: outputExtent,
-                    maskCache: &maskCache
+                    maskCache: &maskCache,
+                    beautifyPaddingRatio: beautifyPadding,
+                    beautifyCornerRadiusPoints: beautifyRadius
                 )
 
                 if !cursorSampler.isEmpty, let cursorCI, let rippleCI {
@@ -1556,7 +1570,7 @@ class ScreenRecorder: NSObject, ObservableObject {
                     )
                 }
 
-                let finalImage = exportSettings.cropTo16x9
+                let finalImage = (exportSettings.cropTo16x9 && exportSettings.canvasAspect == .source)
                     ? Self.cropToAspect(composedImage, from: outputExtent, to: bufferExtent)
                     : composedImage
                 ciContext.render(
@@ -1606,15 +1620,18 @@ class ScreenRecorder: NSObject, ObservableObject {
         }
 
         let screenSize = Self.normalizedVideoSize(for: screenTrack)
-        let outputSize = exportSettings.outputSize(for: screenSize)
+        let outputSize = exportSettings.canvasSize(for: screenSize)
         let outputWidth = Int(outputSize.width)
         let outputHeight = Int(outputSize.height)
         let bufferExtent = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
         // 合成阶段始终按「未裁切」的完整画面布局，气泡坐标才不会整体偏移；
-        // 裁切放在最后一步，只影响输出尺寸。
-        let composeSize = exportSettings.cropTo16x9
-            ? exportSettings.resolutionPreset.outputSize(for: screenSize)
-            : CGSize(width: outputWidth, height: outputHeight)
+        // 裁切放在最后一步，只影响输出尺寸。指定了发布画幅时画布即输出。
+        let composeSize: CGSize
+        if exportSettings.canvasAspect == .source && exportSettings.cropTo16x9 {
+            composeSize = exportSettings.resolutionPreset.outputSize(for: screenSize)
+        } else {
+            composeSize = CGSize(width: outputWidth, height: outputHeight)
+        }
         let outputExtent = CGRect(origin: .zero, size: composeSize)
 
         // 自绘光标：事件轨存在才启用（录制时源画面已隐藏系统光标）。
@@ -1623,12 +1640,15 @@ class ScreenRecorder: NSObject, ObservableObject {
         var cursorSampler = CursorEventSampler(samples: cursorTrack?.events ?? [])
         let cursorCI: CIImage? = cursorTrack == nil ? nil : CursorRenderer.arrowCGImage().map { CIImage(cgImage: $0) }
         let rippleCI: CIImage? = cursorTrack == nil ? nil : CursorRenderer.rippleCGImage().map { CIImage(cgImage: $0) }
-        let cursorContentRect = CursorRenderer.contentRect(
-            sourceExtent: CGRect(origin: .zero, size: screenSize),
-            in: outputExtent
-        )
         // 自动缩放：点击聚焦区间（停录时由光标事件轨生成）
         let zoomRanges = ZoomRangeStore.load(from: ZoomRangeStore.zoomURL(for: screenURL))?.ranges ?? []
+        let beautifyPadding = exportSettings.beautifyEnabled ? exportSettings.beautifyPaddingRatio : 0
+        let beautifyRadius = exportSettings.beautifyEnabled ? exportSettings.beautifyCornerRadiusPoints : 0
+        let cursorContentRect = CursorRenderer.contentRect(
+            sourceExtent: CGRect(origin: .zero, size: screenSize),
+            in: outputExtent,
+            paddingRatio: beautifyPadding
+        )
 
         let screenReader = try AVAssetReader(asset: screenAsset)
         let readerSettings: [String: Any] = [
@@ -1817,7 +1837,9 @@ class ScreenRecorder: NSObject, ObservableObject {
                         cut: resolvedCut.cut,
                         overlaySample: overlaySample,
                         outputExtent: outputExtent,
-                        maskCache: &maskCache
+                        maskCache: &maskCache,
+                        beautifyPaddingRatio: beautifyPadding,
+                        beautifyCornerRadiusPoints: beautifyRadius
                     )
 
                     if !cursorSampler.isEmpty, let cursorCI, let rippleCI,
@@ -1833,7 +1855,7 @@ class ScreenRecorder: NSObject, ObservableObject {
                         )
                     }
 
-                    let finalImage = exportSettings.cropTo16x9
+                    let finalImage = (exportSettings.cropTo16x9 && exportSettings.canvasAspect == .source)
                         ? Self.cropToAspect(composedImage, from: outputExtent, to: bufferExtent)
                         : composedImage
 
@@ -1999,14 +2021,17 @@ class ScreenRecorder: NSObject, ObservableObject {
         overlaySample: CameraOverlayMetadataSample?,
         metadata: CameraOverlayMetadataFile,
         outputExtent: CGRect,
-        maskCache: inout [String: CIImage]
+        maskCache: inout [String: CIImage],
+        beautifyPaddingRatio: Double = 0,
+        beautifyCornerRadiusPoints: Double = 0
     ) -> CIImage {
-        let screenBase = Self.aspectFit(
+        let screenBase = beautifiedOrFittedBase(
             screenImage,
-            sourceExtent: screenImage.extent,
-            targetRect: outputExtent
+            outputExtent: outputExtent,
+            paddingRatio: beautifyPaddingRatio,
+            cornerRadiusPoints: beautifyCornerRadiusPoints,
+            maskCache: &maskCache
         )
-        .cropped(to: outputExtent)
 
         guard let cameraImage, let overlaySample else {
             return screenBase
@@ -2092,14 +2117,17 @@ class ScreenRecorder: NSObject, ObservableObject {
         cut: RecordingEditCut,
         overlaySample: CameraOverlayMetadataSample?,
         outputExtent: CGRect,
-        maskCache: inout [String: CIImage]
+        maskCache: inout [String: CIImage],
+        beautifyPaddingRatio: Double = 0,
+        beautifyCornerRadiusPoints: Double = 0
     ) -> CIImage {
-        let screenBase = Self.aspectFit(
+        let screenBase = beautifiedOrFittedBase(
             screenImage,
-            sourceExtent: screenImage.extent,
-            targetRect: outputExtent
+            outputExtent: outputExtent,
+            paddingRatio: beautifyPaddingRatio,
+            cornerRadiusPoints: beautifyCornerRadiusPoints,
+            maskCache: &maskCache
         )
-        .cropped(to: outputExtent)
 
         switch cut.layoutMode {
         case .screenFullScreen:
@@ -2198,6 +2226,88 @@ class ScreenRecorder: NSObject, ObservableObject {
 
     /// 把合成好的整幅画面按目标比例居中裁切，再缩放到目标尺寸。
     /// 用于「导出 16:9」：整屏录制是 1.53:1，直接上传会被平台加黑边。
+    /// 美化开启时：底色画布 + 留白 + 圆角悬浮画面；关闭时：直接铺满。
+    private nonisolated static func beautifiedOrFittedBase(
+        _ screenImage: CIImage,
+        outputExtent: CGRect,
+        paddingRatio: Double,
+        cornerRadiusPoints: Double,
+        maskCache: inout [String: CIImage]
+    ) -> CIImage {
+        guard paddingRatio > 0 else {
+            return Self.aspectFit(
+                screenImage,
+                sourceExtent: screenImage.extent,
+                targetRect: outputExtent
+            )
+            .cropped(to: outputExtent)
+        }
+
+        let inset = min(outputExtent.width, outputExtent.height) * CGFloat(paddingRatio)
+        let contentTarget = outputExtent.insetBy(dx: inset, dy: inset)
+        let fittedRect = CursorRenderer.contentRect(
+            sourceExtent: screenImage.extent,
+            in: contentTarget
+        )
+        let fitted = Self.aspectFit(
+            screenImage,
+            sourceExtent: screenImage.extent,
+            targetRect: fittedRect
+        )
+
+        let slate = RecordingExportSettings.beautifySlateBackground
+        let background = CIImage(
+            color: CIColor(red: slate.red, green: slate.green, blue: slate.blue)
+        ).cropped(to: outputExtent)
+
+        // 圆角随输出分辨率缩放：20pt 是 1080p 基准（HuaStudio 实测值）
+        let radius = CGFloat(cornerRadiusPoints) * (outputExtent.height / 1080.0)
+        let cacheKey = "rounded-mask-\(Int(fittedRect.width))x\(Int(fittedRect.height))-\(Int(radius))"
+        if maskCache[cacheKey] == nil,
+           let maskImage = Self.roundedRectMaskCGImage(size: fittedRect.size, radius: radius) {
+            maskCache[cacheKey] = CIImage(cgImage: maskImage)
+        }
+        if let maskTemplate = maskCache[cacheKey] {
+            let mask = maskTemplate.transformed(by: CGAffineTransform(
+                translationX: fittedRect.minX,
+                y: fittedRect.minY
+            ))
+            return fitted
+                .applyingFilter("CIBlendWithMask", parameters: [
+                    kCIInputBackgroundImageKey: background,
+                    kCIInputMaskImageKey: mask
+                ])
+                .cropped(to: outputExtent)
+        }
+        return fitted.composited(over: background).cropped(to: outputExtent)
+    }
+
+    /// 圆角矩形蒙版。用 CoreGraphics 画（CIFilter CIRoundedRectangleGenerator
+    /// 的参数键是 inputExtent 而非 inputWidth/Height，用错键会抛 ObjC 异常
+    /// 直接崩掉导出——2026-10-24 自测实测踩过）。
+    private nonisolated static func roundedRectMaskCGImage(size: CGSize, radius: CGFloat) -> CGImage? {
+        let width = max(2, Int(size.width.rounded()))
+        let height = max(2, Int(size.height.rounded()))
+        guard let cg = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        cg.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        cg.addPath(CGPath(
+            roundedRect: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)),
+            cornerWidth: max(1, radius),
+            cornerHeight: max(1, radius),
+            transform: nil
+        ))
+        cg.fillPath()
+        return cg.makeImage()
+    }
+
     private nonisolated static func cropToAspect(
         _ image: CIImage,
         from sourceExtent: CGRect,
@@ -3072,6 +3182,13 @@ extension ScreenRecorder {
         // 计算相对于第一帧的时间差，使用实际时间戳
         guard let firstTime = firstVideoFrameTime else { return }
         let relativeTime = CMTimeSubtract(currentFrameTime, firstTime)
+        if let lastPTS = lastAppendedVideoPTS, relativeTime <= lastPTS {
+            print(String(
+                format: "⚠️  丢弃非单调帧: %.4fs ≤ 已写入 %.4fs（暂停边界护栏）",
+                CMTimeGetSeconds(relativeTime), CMTimeGetSeconds(lastPTS)
+            ))
+            return
+        }
         guard let adjustedBuffer = adjustedVideoSampleBuffer(sampleBuffer, relativeTo: firstTime) else {
             return
         }
@@ -3086,6 +3203,7 @@ extension ScreenRecorder {
         if writerInput.isReadyForMoreMediaData {
             let success = writerInput.append(adjustedBuffer)
             if success {
+                lastAppendedVideoPTS = relativeTime
                 frameCount += 1
                 recordingMetrics.incrementScreenAppended()
             } else {

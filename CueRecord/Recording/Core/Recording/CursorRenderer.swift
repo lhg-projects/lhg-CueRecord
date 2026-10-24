@@ -49,15 +49,21 @@ nonisolated enum CursorRenderer {
     static let rippleDuration = 0.45
 
     /// aspect-fit 后的内容矩形（与 ScreenRecorder.aspectFit 同公式）。
-    static func contentRect(sourceExtent: CGRect, in target: CGRect) -> CGRect {
+    /// paddingRatio > 0 时先按短边比例内缩（美化画布的留白）。
+    static func contentRect(sourceExtent: CGRect, in target: CGRect, paddingRatio: Double = 0) -> CGRect {
+        var fitTarget = target
+        if paddingRatio > 0 {
+            let inset = min(target.width, target.height) * CGFloat(paddingRatio)
+            fitTarget = target.insetBy(dx: inset, dy: inset)
+        }
         guard sourceExtent.width > 0, sourceExtent.height > 0,
-              target.width > 0, target.height > 0 else { return target }
-        let scale = min(target.width / sourceExtent.width, target.height / sourceExtent.height)
+              fitTarget.width > 0, fitTarget.height > 0 else { return fitTarget }
+        let scale = min(fitTarget.width / sourceExtent.width, fitTarget.height / sourceExtent.height)
         let width = sourceExtent.width * scale
         let height = sourceExtent.height * scale
         return CGRect(
-            x: target.midX - width / 2,
-            y: target.midY - height / 2,
+            x: fitTarget.midX - width / 2,
+            y: fitTarget.midY - height / 2,
             width: width,
             height: height
         )

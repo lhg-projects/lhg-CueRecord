@@ -550,6 +550,11 @@ final class RecordingController: ObservableObject {
     /// 用户直到导出看到全黑成片才知道录废了（2026-10-23 事故，HANDOVER 第 12 节）。
     private func presentDamageAlertIfNeeded(validation: RecordingOutputValidation?, outputURL: URL?) {
         guard let validation, validation.health == .damaged else { return }
+        // 自测模式不能弹模态框（无人值守会卡死），只落日志与报告
+        guard !RecordingSmokeTestRunner.isRequested else {
+            print("🧪 [smoke] 损坏弹窗跳过：\(validation.issues.joined(separator: "；"))")
+            return
+        }
 
         let alert = NSAlert()
         alert.alertStyle = .critical

@@ -385,3 +385,28 @@ grep -a "📊" /tmp/mem.log
 - 预览里曾有**两块背景**，第二块（浮动预览）写死 `.fill(.black)` 不看设置，是「选全透明仍是黑板」的真凶。
 - 透明问题按顺序查：视图背景 → 宿主 layer（`contentsScale` / `backgroundColor`）→ 窗口 `isOpaque`/`backgroundColor` → `hasShadow` → 圆角裁剪。
 - 判断「是不是同一个应用」用 `codesign -d -r-`，看 `designated` 是 cdhash 还是 identifier。
+
+---
+
+## 15. 2026-10-24 深夜：HuaStudio 借鉴轮（2.8.0）
+
+来源：`lhg-projects/lhg-hua-studio` 逆向蒸馏包（实测参数 + Agent 剪辑机制）。
+
+| 提交 | 能力 | 说明 |
+|---|---|---|
+| `6f605f9` | 缩放参数校准 | 换成实测常数：保持 1500ms、点击倍率 1.6x、聚焦中心上移 2.7%；先导 450ms 与实测完全一致 |
+| `1bce5ef` | 内置自测 | `--smoke-record` 全自动跑「录 3s → 打标记 → 暂停 3s → 恢复 3s → 停止 → 导出」并校验，报告写 `/tmp/llsstudio-smoke-report.json`。**第 11 节悬置的暂停验证正式闭环**：墙钟约 9.6s（含 3.2s 暂停）→ 成片 6.4s |
+| `66c860c` | 闲段建议 | quietSpans（没说话∧没操作）→ `<base>_idle.json`，附开录头 1.5s 裁剪建议；转写缺失时宁缺毋滥不出建议 |
+| `cd0b806` | Agent 剪辑 | ⌘⇧E 打开：把转写/标记/闲段/缩放汇总成一段自带操作规范的提示词（进剪贴板 + 存 `_agent-prompt.md`），粘给任意 AI；AI 产出 edits.json 选回来应用即导出。`_zoom.json` 改写前备份 `.bak`，AI 只能改参数碰不到渲染 |
+| 2.8.0 | 画布/美化后端 | 画幅（source/16:9/9:16）+ 美化（留白 10.5%、圆角 20、墨岩底色，HuaStudio 实测默认值）渲染管线已实现并有测试。**竖屏不上 UI**（刘老师 2026-10-24 明确不需要），16:9 继续走既有裁切开关；能力入库，要启用时在编辑器 exportSection 加回 Picker 即可 |
+| 2.8.0 | writer 单调护栏 | 见下面"重要发现"第 1 条 |
+
+**本轮自测撞出的重要发现**：
+
+1. **10-23 黑屏事故的真实机理复现了**。自测第 4 次运行：暂停恢复后首帧（约 3.1s 处）`writerInput.append` 失败（"The operation could not be completed"）→ writer 进 `.failed` → 后续帧全部静默跳过 → moov 永不写入。症状与用户 10-23 15:20 那条完全一致（moov not found + metrics damaged + 同样用了暂停），且是间歇性的（前三次自测全过）。已加护栏：**非单调时间戳帧直接丢弃**（丢一帧无感，毒死 writer 是全损）。若日后仍复现，排查方向是 SCStream 在暂停边界投递的帧时间戳。
+2. 自测模式（`--smoke-record`）会跳过损坏弹窗与恢复提示，无人值守不卡死。
+3. **导出完成后归档器会把原始素材移进 `raw_data/`**——之后对同一 take 再次导出必须用移动后的路径（Agent 剪辑窗口经 `CapturedRecordingOutput(discovering:)` 自动处理）。
+4. 不同画幅的导出写同一条 `_edited.mov`，相互覆盖；同一素材要两种画幅需先复制。
+5. `CIRoundedRectangleGenerator` 的参数键是 `inputExtent`（CIVector），**不是** `inputWidth/inputHeight`——用错键抛 ObjC 异常直接崩掉导出。圆角蒙版已改用 CoreGraphics 绘制（与光标/波纹同一套画法）。
+
+**打包**：2.8.0 (build 28)，DMG 在桌面 `LLSStudio-2.8.0.dmg`。核心测试 34 项。
