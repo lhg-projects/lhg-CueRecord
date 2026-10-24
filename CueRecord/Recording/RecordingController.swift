@@ -461,6 +461,13 @@ final class RecordingController: ObservableObject {
         return marker
     }
 
+    /// --smoke-record 专用：合成光标事件，保证无人值守环境里光标链路
+    /// （侧车 → 自动缩放 → 导出渲染）被确定性覆盖。坐标为主屏全局坐标。
+    func simulateCursorEventForSmoke(x: Double, y: Double, click: Bool) {
+        guard RecordingSmokeTestRunner.isRequested else { return }
+        cursorTracker.simulateEvent(globalLocation: CGPoint(x: x, y: y), isClick: click)
+    }
+
     func stopRecording(completion: (() -> Void)? = nil) {
         if let completion {
             pendingStopCompletions.append(completion)

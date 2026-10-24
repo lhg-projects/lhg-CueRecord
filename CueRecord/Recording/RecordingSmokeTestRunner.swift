@@ -62,12 +62,22 @@ enum RecordingSmokeTestRunner {
         }
         report["started"] = true
         let outputURL = controller.recordingState.outputURL
+        let mainScreen = NSScreen.main?.frame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
 
-        // 2. 录 3s，中途打一个标记
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        // 2. 录 3s：中途合成光标事件（移动 + 点击 + 移动），无人值守也能
+        //    确定性覆盖光标链路；打一个标记
+        try? await Task.sleep(nanoseconds: 800_000_000)
+        controller.simulateCursorEventForSmoke(x: mainScreen.midX, y: mainScreen.midY, click: false)
+        try? await Task.sleep(nanoseconds: 400_000_000)
         let marker = controller.addMarkerAtCurrentTime()
         report["markerAdded"] = marker != nil
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        controller.simulateCursorEventForSmoke(
+            x: mainScreen.midX + mainScreen.width * 0.05,
+            y: mainScreen.midY,
+            click: true
+        )
+        try? await Task.sleep(nanoseconds: 1_400_000_000)
 
         // 3. 暂停 3s（这段不应进入成片）
         let wallClockBeforePause = Date()
@@ -76,8 +86,14 @@ enum RecordingSmokeTestRunner {
         controller.togglePauseRecording()
         let pauseWallSeconds = Date().timeIntervalSince(wallClockBeforePause)
 
-        // 4. 恢复再录 3s，然后停止
-        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        // 4. 恢复再录 3s（再动一下光标），然后停止
+        try? await Task.sleep(nanoseconds: 800_000_000)
+        controller.simulateCursorEventForSmoke(
+            x: mainScreen.midX - mainScreen.width * 0.08,
+            y: mainScreen.midY + mainScreen.height * 0.05,
+            click: false
+        )
+        try? await Task.sleep(nanoseconds: 2_200_000_000)
         let stopped = await withCheckedContinuation { continuation in
             controller.stopRecording {
                 continuation.resume(returning: true)
@@ -105,20 +121,40 @@ enum RecordingSmokeTestRunner {
             fail(&report, &allOk, "pauseCut", "屏幕轨不可读——录制产物损坏")
         }
 
-        // 6. 侧车齐全性
-        let cursorExists = FileManager.default.fileExists(atPath: CursorEventStore.cursorURL(for: captured.outputURL).path)
-        report["cursorTrack"] = cursorExists
-        if !cursorExists {
-            fail(&report, &allOk, "cursorTrack", "缺少 _cursor.json")
+        // 6. 侧车齐全性：合成事件保证光标轨必须存在且事件数够（移动+点击+移动）
+        let cursorTrackFile = CursorEventStore.load(from: CursorEventStore.cursorURL(for: captured.outputURL))
+        let cursorEventCount = cursorTrackFile?.events.count ?? 0
+        report["cursorEventCount"] = cursorEventCount
+        if cursorEventCount < 3 {
+            fail(&report, &allOk, "cursorTrack", "光标事件应有 ≥3 条（合成 3 条），实际 \(cursorEventCount)")
+        } else {
+            report["cursorTrack"] = true
         }
         let markers = RecordingMarkerStore.load(from: RecordingMarkerStore.markersURL(for: captured.outputURL))
         report["markerCount"] = markers.count
         if markers.count != 1 {
             fail(&report, &allOk, "markers", "应有 1 个标记，实际 \(markers.count)")
         }
+        // 合成的点击应触发自动缩放区间
+        let zoomRanges = ZoomRangeStore.load(from: ZoomRangeStore.zoomURL(for: captured.outputURL))?.ranges ?? []
+        report["zoomRangeCount"] = zoomRanges.count
+        if zoomRanges.isEmpty {
+            fail(&report, &allOk, "autoZoom", "合成点击后应生成自动缩放区间")
+        }
 
-        // 7. 导出（.all = 原始合成模式）
-        controller.renderPendingCapturedRecording(mode: .all, exportSettings: .default)
+        // 7. 导出：走 .edited 渲染路径（单段全时长、纯屏幕布局），
+        //    才能真实过一遍"缩放裁切 + 自绘光标 + 30fps CFR"的渲染循环
+        let fullRangeCut = RecordingEditCut(
+            startTime: 0,
+            endTime: (rawDuration ?? 6) + 1,
+            layoutMode: .screenFullScreen,
+            cameraFrame: .defaultCameraFrame,
+            cameraShape: .circle
+        )
+        controller.renderPendingCapturedRecording(
+            editDecision: RecordingEditDecision(cuts: [fullRangeCut]),
+            exportSettings: .default
+        )
         let exportDeadline = Date().addingTimeInterval(180)
         var exportedURL: URL?
         while Date() < exportDeadline {
@@ -132,8 +168,10 @@ enum RecordingSmokeTestRunner {
             let exportDuration = assetDuration(of: exportedURL)
             report["exportedURL"] = exportedURL.path
             report["exportDurationSeconds"] = exportDuration
-            if let exportDuration, exportDuration > 0.5 {
-                report["export"] = String(format: "ok（%.2fs）", exportDuration)
+            if let exportDuration, exportDuration > 0.5, exportedURL.path != captured.outputURL.path {
+                report["export"] = String(format: "ok（%.2fs，渲染产物独立落盘）", exportDuration)
+            } else if exportedURL.path == captured.outputURL.path {
+                fail(&report, &allOk, "export", "导出结果指向原始轨，渲染循环未执行")
             } else {
                 fail(&report, &allOk, "export", "导出文件不可读或时长异常")
             }

@@ -173,16 +173,6 @@ final class CursorEventTracker {
 
     private func handle(_ event: NSEvent) {
         guard isActive else { return }
-        let elapsed = elapsedProvider()
-        guard elapsed >= 0, let rect = track.recordingRect?.cgRect else { return }
-
-        let location = NSEvent.mouseLocation
-        guard let normalized = CursorGeometry.normalizedPoint(
-            globalX: location.x,
-            globalY: location.y,
-            in: rect
-        ) else { return }
-
         let isClick: Bool
         switch event.type {
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
@@ -190,6 +180,26 @@ final class CursorEventTracker {
         default:
             isClick = false
         }
+        ingest(globalLocation: NSEvent.mouseLocation, isClick: isClick)
+    }
+
+    /// 自测专用（--smoke-record）：不经 NSEvent，直接走同一条归一化/节流/追加
+    /// 路径。无人值守环境里鼠标可能全程不动，静止压缩会 legitimately 产生
+    /// 零事件；合成事件让光标链路（侧车→缩放→导出渲染）被确定性覆盖。
+    func simulateEvent(globalLocation: CGPoint, isClick: Bool) {
+        guard isActive else { return }
+        ingest(globalLocation: globalLocation, isClick: isClick)
+    }
+
+    private func ingest(globalLocation location: CGPoint, isClick: Bool) {
+        let elapsed = elapsedProvider()
+        guard elapsed >= 0, let rect = track.recordingRect?.cgRect else { return }
+
+        guard let normalized = CursorGeometry.normalizedPoint(
+            globalX: location.x,
+            globalY: location.y,
+            in: rect
+        ) else { return }
 
         let sample = CursorEventSample(
             t: (elapsed * 1000).rounded() / 1000,
