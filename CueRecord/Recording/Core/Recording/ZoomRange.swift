@@ -137,17 +137,23 @@ nonisolated enum ZoomTimeline {
 /// - 过短的区间丢弃（不值得缩）
 nonisolated enum ZoomHeuristic {
     struct Configuration: Sendable {
+        // 以下四个常数校准自 HuaStudio 1.8 的实测数据（误差 0.0ms，见
+        // lhg-hua-studio/analysis/HuaStudio-RUNTIME.md 第三节）：
+        // 先导 450ms（我们原值即 450）、保持 1500ms（原 1700）、倍率 1.6（原 1.9，
+        // "2.0 会晕、1.3 看不出"）、中心向上偏移 0.027（点击目标在按钮上，
+        // 用户关注的是按钮周围的内容）。
         var leadSeconds: Double = 0.45
-        var holdSeconds: Double = 1.7
+        var holdSeconds: Double = 1.5
+        var clickZoomScale: Double = 1.6
+        var focusUpwardOffset: Double = 0.027
         var mergeGapSeconds: Double = 1.4
         var mergeDistance: Double = 0.30
         var minimumRangeSeconds: Double = 1.4
-        var zoomScale: Double = 1.9
         var easingSeconds: Double = 0.38
-        // 停留（悬停阅读）参数
+        // 停留（悬停阅读）参数：倍率低于点击一档，保持"阅读轻、操作重"的层次
         var dwellRadius: Double = 0.03
         var dwellMinimumSeconds: Double = 1.8
-        var dwellZoomScale: Double = 1.5
+        var dwellZoomScale: Double = 1.4
         var dwellHoldSeconds: Double = 0.8
         /// 停留开始后多久开始放大（不能一停就缩，那是指针在喘气不是在阅读）
         var dwellEngageDelayFraction: Double = 0.3
@@ -216,8 +222,10 @@ nonisolated enum ZoomHeuristic {
                 startSeconds: (cluster.times.min() ?? 0) - configuration.leadSeconds,
                 endSeconds: (cluster.times.max() ?? 0) + configuration.holdSeconds,
                 centerX: cluster.sumX / count,
-                centerY: cluster.sumY / count,
-                zoomScale: configuration.zoomScale,
+                // 实测规律：点击目标通常在按钮上，用户关注的是按钮周围的内容，
+                // 中心要向上让出约 2.7%（HuaStudio 实测偏移量）
+                centerY: min(max(cluster.sumY / count - configuration.focusUpwardOffset, 0), 1),
+                zoomScale: configuration.clickZoomScale,
                 easingSeconds: configuration.easingSeconds
             )
         }
